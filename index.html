@@ -44,15 +44,19 @@
         for (const target of targets) {
             const display = document.getElementById(`results-${target.id}`);
             try {
-                // Using corsproxy.io (No demo button needed)
+                // We use AllOrigins to bypass the header-blocking issue
                 const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.id}`;
-                const finalUrl = `https://corsproxy.io/?url=${encodeURIComponent(ltaUrl)}`;
+                const finalUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
 
+                // We send the AccountKey directly in the fetch
                 const response = await fetch(finalUrl, {
                     headers: { 'AccountKey': API_KEY }
                 });
 
-                const data = await response.json();
+                const wrapper = await response.json();
+                
+                // AllOrigins returns the data inside a 'contents' string
+                const data = JSON.parse(wrapper.contents);
                 
                 if (!data.Services || data.Services.length === 0) {
                     display.innerHTML = "No buses found.";
@@ -66,8 +70,8 @@
                         let wait = "-";
                         if (estimate) {
                             const diff = new Date(estimate) - new Date();
-                            wait = Math.max(0, Math.floor(diff / 60000)) + "m";
-                            if (parseInt(wait) <= 0) wait = "Arr";
+                            const mins = Math.max(0, Math.floor(diff / 60000));
+                            wait = mins <= 0 ? "Arr" : mins + "m";
                         }
                         html += `<div class="bus-row"><span class="bus-no">${service.ServiceNo}</span><span class="arrival">${wait}</span></div>`;
                     }
@@ -76,7 +80,8 @@
                 display.innerHTML = html || "Target buses not active.";
 
             } catch (err) {
-                display.innerHTML = "Error loading data.";
+                // If this triggers, the proxy itself is likely blocked
+                display.innerHTML = "Proxy connection failed.";
                 console.error(err);
             }
         }
