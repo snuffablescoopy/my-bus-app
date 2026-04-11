@@ -1,108 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SG Bus Tracker</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
-        .container { width: 100%; max-width: 400px; }
-        .stop-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        h2 { margin: 0 0 15px 0; color: #007bff; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
-        .bus-no { font-weight: 900; font-size: 1.4rem; color: #333; }
-        .wait { font-weight: 800; font-size: 1.4rem; color: #2ecc71; }
-        .soon { color: #e74c3c; animation: blink 1.2s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
-        #status { text-align: center; font-size: 0.75rem; color: #7f8c8d; margin-top: 20px; }
-        .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; cursor: pointer; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <button class="refresh-btn" onclick="update()">🔄 REFRESH BUS TIMINGS</button>
-
-    <div id="stop-09022" class="stop-card">
-        <h2>Orchard Stn (09022)</h2>
-        <div class="results">Connecting...</div>
-    </div>
-
-    <div id="stop-14121" class="stop-card">
-        <h2>Opp Botanic Gdns (14121)</h2>
-        <div class="results">Connecting...</div>
-    </div>
-
-    <div id="status">Syncing with LTA...</div>
-</div>
-
-<script>
-    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+async function update() {
+    document.getElementById('status').innerText = "Updating...";
     
-    const myTargets = [
-        { stop: '09022', buses: ['190', '972'] },
-        { stop: '14121', buses: ['66', '154'] }
-    ];
+    // IMPORTANT: You must visit https://cors-anywhere.herokuapp.com/corsdemo 
+    // and click "Request temporary access" for this to work!
+    const proxyUrl = "https://cors-anywhere.herokuapp.com/";
+    
+    for (let target of myTargets) {
+        const container = document.querySelector(`#stop-${target.stop} .results`);
+        try {
+            const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
 
-    async function update() {
-        document.getElementById('status').innerText = "Updating...";
-        
-        for (let target of myTargets) {
-            const container = document.querySelector(`#stop-${target.stop} .results`);
-            try {
-                // LTA Endpoint
-                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
-                
-                // We use corsproxy.io but we do NOT send headers via JS (which causes the block)
-                // Instead, we pass the AccountKey inside the URL for the proxy to use
-                const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(ltaUrl)}&key=${API_KEY}`;
-
-                // Simple fetch - the proxy handles the 'AccountKey' header on its end
-                const resp = await fetch(proxyUrl);
-                
-                if (!resp.ok) throw new Error('API Error');
-                
-                const data = await resp.json();
-
-                if (!data || !data.Services) {
-                    container.innerHTML = "<div>No data.</div>";
-                    continue;
+            const resp = await fetch(proxyUrl + ltaUrl, {
+                method: 'GET',
+                headers: { 
+                    'AccountKey': '5WOBIXmsSTyK2fmx1NqlSA==',
+                    'Accept': 'application/json'
                 }
+            });
 
-                const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
-
-                if (filtered.length === 0) {
-                    container.innerHTML = "<div style='color:#999'>No buses found.</div>";
-                } else {
-                    container.innerHTML = "";
-                    filtered.forEach(bus => {
-                        const arrival = bus.NextBus.EstimatedArrival;
-                        let timeText = "-";
-                        let wait = null;
-
-                        if (arrival) {
-                            wait = Math.floor((new Date(arrival) - new Date()) / 60000);
-                            timeText = wait <= 0 ? 'Arr' : wait + 'm';
-                        }
-                        
-                        container.innerHTML += `
-                            <div class="row">
-                                <span class="bus-no">${bus.ServiceNo}</span>
-                                <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
-                            </div>`;
-                    });
-                }
-            } catch (e) {
-                console.error(e);
-                container.innerHTML = `<div style='color:#e74c3c; font-size:0.75rem'>Service Busy. Try again in a moment.</div>`;
+            if (resp.status === 403) {
+                container.innerHTML = `<div style='color:#f39c12; font-size:0.7rem'>Click the 'CORS Demo' link to enable access.</div>`;
+                continue;
             }
+
+            if (!resp.ok) throw new Error('LTA Rejected Request');
+            
+            const data = await resp.json();
+            container.innerHTML = "";
+            
+            const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
+
+            if (filtered.length === 0) {
+                container.innerHTML = "<div style='color:#999'>No buses found.</div>";
+            } else {
+                filtered.forEach(bus => {
+                    const arrival = bus.NextBus.EstimatedArrival;
+                    const wait = arrival ? Math.max(0, Math.floor((new Date(arrival) - new Date()) / 60000)) : null;
+                    const timeText = (wait === null) ? '-' : (wait <= 0 ? 'Arr' : wait + 'm');
+                    
+                    container.innerHTML += `
+                        <div class="row">
+                            <span class="bus-no">${bus.ServiceNo}</span>
+                            <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
+                        </div>`;
+                });
+            }
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = `<div style='color:#e74c3c; font-size:0.75rem'>LTA Key Rejected or Proxy Down.</div>`;
         }
-        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
     }
-
-    update();
-    setInterval(update, 30000); 
-</script>
-
-</body>
-</html>
+    document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
+}
