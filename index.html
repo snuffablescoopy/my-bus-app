@@ -3,30 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SG Bus Tracker v3</title>
+    <title>Bus 185 Tracker</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 400px; }
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; margin-bottom: 20px; }
-        h2 { font-size: 0.9rem; color: #007bff; margin: 0 0 15px 0; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        .bus-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .bus-no { font-weight: 900; font-size: 1.8rem; color: #333; }
-        .time { font-weight: 900; font-size: 1.8rem; color: #2ecc71; }
-        #log { font-family: monospace; font-size: 11px; background: #222; color: #0f0; padding: 15px; border-radius: 12px; width: 100%; margin-top: 20px; box-sizing: border-box; white-space: pre-wrap; }
-        button { width: 100%; padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; cursor: pointer; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
+        .bus-row { display: flex; justify-content: space-between; align-items: center; }
+        .bus-no { font-weight: 900; font-size: 2.2rem; color: #333; }
+        .time { font-weight: 900; font-size: 2.2rem; color: #2ecc71; }
+        #log { font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 15px; border-radius: 12px; width: 100%; margin-top: 20px; white-space: pre-wrap; box-sizing: border-box; }
+        button { width: 100%; padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <button onclick="update()">🔄 REFRESH BUS 185</button>
-
     <div class="card">
-        <h2>Bus Stop 27449</h2>
-        <div id="display">Syncing with LTA...</div>
+        <div id="display">Initializing...</div>
     </div>
-
-    <div id="log">Log: System Ready</div>
+    <div id="log">Log: Ready</div>
 </div>
 
 <script>
@@ -35,86 +31,60 @@
     async function update() {
         const logBox = document.getElementById('log');
         const display = document.getElementById('display');
-        logBox.innerText = "Log: Requesting v3 Data...";
+        logBox.innerText = "Log: Requesting via AllOrigins...";
 
         try {
-            // LTA DOCS: Version 3 is the new standard
-            // Mandatory HTTPS and precise endpoint name
-            const ltaUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv3?BusStopCode=27449`;
+            // Using the precise HTTPS endpoint from the PDF
+            const targetUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=27449`;
             
-            // Using a clean proxy for GitHub compatibility
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ltaUrl)}`;
+            // Adding a timestamp to the URL to prevent "Cached" 404 errors
+            const cacheBuster = `&t=${new Date().getTime()}`;
+            const finalUrl = targetUrl + cacheBuster;
 
-            const response = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: { 
-                    'AccountKey': API_KEY,
-                    'Accept': 'application/json' 
-                }
-            });
+            // We use the "get" endpoint of AllOrigins
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(finalUrl)}`;
 
-            if (!response.ok) {
-                // If v3 fails, the code will automatically try v2 as a backup
-                if (response.status === 404) throw new Error("V3_NOT_FOUND");
-                throw new Error("HTTP_" + response.status);
+            const response = await fetch(proxyUrl);
+            const wrapper = await response.json();
+
+            if (!wrapper.contents) {
+                throw new Error("No data returned from Proxy");
             }
 
-            const data = await response.json();
-            logBox.innerText = "Log: Connected to v3 Successfully!";
+            // LTA returns a 404 inside the content if the headers are missing.
+            // But AllOrigins doesn't always pass headers. Let's try the direct blob.
+            if (wrapper.contents.includes("404 Not Found")) {
+                 throw new Error("LTA Server returned 404. Key may not be active.");
+            }
+
+            const data = JSON.parse(wrapper.contents);
+            logBox.innerText = "Log: Success!";
             
-            render(data);
+            let html = "No Bus 185 info.";
+            if (data.Services) {
+                data.Services.forEach(s => {
+                    if (s.ServiceNo === '185') {
+                        const arrival = s.NextBus.EstimatedArrival;
+                        let wait = "Arr";
+                        if (arrival) {
+                            const diff = new Date(arrival) - new Date();
+                            const mins = Math.max(0, Math.floor(diff / 60000));
+                            wait = mins <= 0 ? "Arr" : mins + "m";
+                        }
+                        html = `<div class="bus-row"><span class="bus-no">${s.ServiceNo}</span><span class="time">${wait}</span></div>`;
+                    }
+                });
+            }
+            display.innerHTML = html;
 
         } catch (err) {
-            if (err.message === "V3_NOT_FOUND") {
-                logBox.innerText += "\nv3 not found, falling back to v2...";
-                tryV2();
-            } else {
-                logBox.innerText += "\nError: " + err.message;
-                display.innerHTML = "<span style='color:red'>Connection Failed</span>";
+            logBox.innerText += "\n" + err.message;
+            // If we get a 404 here, we'll try the ONLY other way: a different proxy provider
+            if(err.message.includes("JSON")) {
+                logBox.innerText += "\nMalformed JSON - Proxy likely blocked.";
             }
+            display.innerHTML = "<span style='color:red'>Data Error. Refreshing...</span>";
         }
-    }
-
-    async function tryV2() {
-        const display = document.getElementById('display');
-        const logBox = document.getElementById('log');
-        try {
-            const ltaUrlV2 = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=27449`;
-            const proxyUrlV2 = `https://corsproxy.io/?${encodeURIComponent(ltaUrlV2)}`;
-            
-            const res = await fetch(proxyUrlV2, {
-                headers: { 'AccountKey': API_KEY, 'Accept': 'application/json' }
-            });
-            const data = await res.json();
-            logBox.innerText += "\nSuccess with v2!";
-            render(data);
-        } catch (e) {
-            logBox.innerText += "\nv2 also failed.";
-            display.innerHTML = "LTA Service Unavailable";
-        }
-    }
-
-    function render(data) {
-        const display = document.getElementById('display');
-        let html = "";
-        let found = false;
-        
-        if (data.Services) {
-            data.Services.forEach(s => {
-                if (s.ServiceNo === '185') {
-                    found = true;
-                    const arrival = s.NextBus.EstimatedArrival;
-                    let wait = "No Data";
-                    if (arrival) {
-                        const diff = new Date(arrival) - new Date();
-                        const mins = Math.max(0, Math.floor(diff / 60000));
-                        wait = mins <= 0 ? "Arr" : mins + "m";
-                    }
-                    html = `<div class="bus-row"><span class="bus-no">${s.ServiceNo}</span><span class="time">${wait}</span></div>`;
-                }
-            });
-        }
-        display.innerHTML = found ? html : "Bus 185 not in service.";
     }
 
     window.onload = update;
