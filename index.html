@@ -1,93 +1,578 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus 185 Tracker</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
-        .container { width: 100%; max-width: 400px; }
-        .card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; text-align: center; }
-        .bus-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-        .bus-no { font-weight: 900; font-size: 2.5rem; color: #333; }
-        .time { font-weight: 900; font-size: 2.5rem; color: #2ecc71; }
-        .unit { font-size: 1rem; margin-left: 2px; }
-        #log { font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 15px; border-radius: 12px; width: 100%; margin-top: 20px; white-space: pre-wrap; box-sizing: border-box; }
-        button { width: 100%; padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,123,255,0.3); }
-        h2 { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <button onclick="update()">🔄 REFRESH BUS 185</button>
-    <div class="card">
-        <h2>Bus Stop 27449</h2>
-        <div id="display">Waiting for data...</div>
-    </div>
-    <div id="log">Log: Bridge Access Activated?</div>
-</div>
-
-<script>
-    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-
-    async function update() {
-        const logBox = document.getElementById('log');
-        const display = document.getElementById('display');
-        logBox.innerText = "Log: Crossing the Bridge...";
-
-        try {
-            // THE TARGET
-            const ltaUrl = 'https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=27449';
-            
-            // THE BRIDGE (This only works because you clicked 'Request Access')
-            const proxyUrl = 'https://cors-anywhere.herokuapp.com/' + ltaUrl;
-
-            const response = await fetch(proxyUrl, {
-                method: 'GET',
-                headers: { 
-                    'AccountKey': API_KEY,
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-
-            if (!response.ok) {
-                if (response.status === 403) {
-                    throw new Error("Bridge Expired. Click 'Request Access' again.");
-                }
-                throw new Error("LTA Error: " + response.status);
-            }
-
-            const data = await response.json();
-            logBox.innerText = "Log: SUCCESS! Bridge crossed.";
-
-            let html = "Bus 185 not found.";
-            if (data.Services) {
-                data.Services.forEach(s => {
-                    if (s.ServiceNo === '185') {
-                        const arrival = s.NextBus.EstimatedArrival;
-                        let wait = "Arr";
-                        if (arrival) {
-                            const diff = new Date(arrival) - new Date();
-                            const mins = Math.max(0, Math.floor(diff / 60000));
-                            wait = mins <= 0 ? "Arr" : mins + '<span class="unit">m</span>';
-                        }
-                        html = `<div class="bus-row"><span class="bus-no">${s.ServiceNo}</span><span class="time">${wait}</span></div>`;
-                    }
-                });
-            }
-            display.innerHTML = html;
-
-        } catch (err) {
-            logBox.innerText = "Log Error: " + err.message;
-            display.innerHTML = `<span style='color:red'>Bridge Blocked</span>`;
-            console.error(err);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bus Tracker SG</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #161920;
+      --border: #252830;
+      --accent: #e8ff47;
+      --accent2: #47c8ff;
+      --text: #e8eaf0;
+      --muted: #6b7080;
+      --green: #4ade80;
+      --orange: #fb923c;
+      --red: #f87171;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
     }
 
-    // Run on load
-    update();
-</script>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 60px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow blob */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(232,255,71,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* ── Header ── */
+    header {
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    .bus-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #0d0f14;
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 2px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Config Panel ── */
+    .config {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .config-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0d0f14;
+    }
+
+    .btn-primary:hover { background: #d4e83a; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 6px;
+    }
+
+    .status-dot.live {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Bus Cards ── */
+    .cards { display: flex; flex-direction: column; gap: 12px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .bus-number {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .bus-operator {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .arrivals {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      padding: 14px 18px;
+      gap: 8px;
+    }
+
+    .arrival-slot {
+      text-align: center;
+    }
+
+    .arrival-label {
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .arrival-time {
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .arrival-time.soon { color: var(--red); }
+    .arrival-time.coming { color: var(--orange); }
+    .arrival-time.later { color: var(--green); }
+    .arrival-time.na { color: var(--muted); font-size: 14px; }
+
+    .arrival-unit {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 2px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    .tag.wab { background: rgba(71,200,255,0.15); color: var(--accent2); }
+    .tag.sd { background: rgba(232,255,71,0.12); color: var(--accent); }
+    .tag.dd { background: rgba(251,146,60,0.15); color: var(--orange); }
+
+    /* ── Error / Empty ── */
+    .message-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .message-box .icon { font-size: 32px; margin-bottom: 12px; }
+    .message-box p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .message-box .code { color: var(--accent); font-size: 11px; margin-top: 8px; display: block; }
+
+    /* ── Auto-refresh toggle ── */
+    .refresh-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .toggle-label { font-size: 11px; color: var(--muted); }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+
+    input:checked + .slider { background: rgba(232,255,71,0.2); }
+    input:checked + .slider::before { transform: translateX(16px); background: var(--accent); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <div class="bus-badge">🚌 SG Transit</div>
+      <h1>BUS<span>WATCH</span></h1>
+      <p class="subtitle">Real-time arrival tracker · LTA DataMall</p>
+    </header>
+
+    <div class="config">
+      <div class="config-row">
+        <div class="field">
+          <label>Bus Stop Code</label>
+          <input type="text" id="stopCode" value="27449" maxlength="10" placeholder="e.g. 83139" />
+        </div>
+        <div class="field">
+          <label>Bus Service (optional)</label>
+          <input type="text" id="busFilter" value="185" maxlength="10" placeholder="e.g. 65 or leave blank" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="fetchArrivals()">↻ Fetch Arrivals</button>
+        <button class="btn-secondary" onclick="clearResults()">Clear</button>
+      </div>
+      <div class="refresh-row">
+        <label class="toggle">
+          <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" />
+          <span class="slider"></span>
+        </label>
+        <span class="toggle-label">Auto-refresh every 30s</span>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText"><span class="status-dot"></span>Ready</span>
+      <span id="lastUpdated"></span>
+    </div>
+
+    <div id="results"></div>
+
+    <footer>Data from LTA DataMall · Timings are estimates only</footer>
+  </div>
+
+  <script>
+    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    // CORS proxy — required because LTA API blocks direct browser requests
+    const PROXY = 'https://corsproxy.io/?url=';
+    const LTA_BASE = 'https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival';
+
+    let refreshInterval = null;
+
+    function setStatus(text, live = false) {
+      const dot = live
+        ? '<span class="status-dot live"></span>'
+        : '<span class="status-dot"></span>';
+      document.getElementById('statusText').innerHTML = dot + text;
+    }
+
+    function setLastUpdated() {
+      const now = new Date();
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + now.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function getMinutes(isoString) {
+      if (!isoString || isoString === '0001-01-01T00:00:00+08:00') return null;
+      const diff = (new Date(isoString) - new Date()) / 1000 / 60;
+      return Math.max(0, Math.round(diff));
+    }
+
+    function timeClass(min) {
+      if (min === null) return 'na';
+      if (min <= 3) return 'soon';
+      if (min <= 8) return 'coming';
+      return 'later';
+    }
+
+    function busTypeTag(type) {
+      if (!type) return '';
+      const map = { 'WAB': ['wab', 'Wheelchair'], 'SD': ['sd', 'Single Deck'], 'DD': ['dd', 'Double Deck'] };
+      const [cls, label] = map[type] || ['sd', type];
+      return `<span class="tag ${cls}">${label}</span>`;
+    }
+
+    function renderBus(service) {
+      const buses = [service.NextBus, service.NextBus2, service.NextBus3];
+      const labels = ['Next', '2nd', '3rd'];
+
+      const arrivalsHTML = buses.map((bus, i) => {
+        const min = getMinutes(bus?.EstimatedArrival);
+        const cls = timeClass(min);
+        let timeDisplay, unitDisplay;
+
+        if (min === null) {
+          timeDisplay = `<div class="arrival-time na">—</div>`;
+          unitDisplay = '';
+        } else if (min === 0) {
+          timeDisplay = `<div class="arrival-time soon">ARR</div>`;
+          unitDisplay = '';
+        } else {
+          timeDisplay = `<div class="arrival-time ${cls}">${min}</div>`;
+          unitDisplay = `<div class="arrival-unit">min</div>`;
+        }
+
+        return `
+          <div class="arrival-slot">
+            <div class="arrival-label">${labels[i]}</div>
+            ${timeDisplay}
+            ${unitDisplay}
+            ${busTypeTag(bus?.Type)}
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <div class="bus-number">${service.ServiceNo}</div>
+            <div class="bus-operator">${service.Operator || ''}</div>
+          </div>
+          <div class="arrivals">${arrivalsHTML}</div>
+        </div>`;
+    }
+
+    async function fetchArrivals() {
+      const stopCode = document.getElementById('stopCode').value.trim();
+      const busFilter = document.getElementById('busFilter').value.trim();
+
+      if (!stopCode) {
+        showError('Please enter a bus stop code.', null);
+        return;
+      }
+
+      setStatus('Fetching...', false);
+      document.getElementById('results').innerHTML = '';
+
+      let url = `${LTA_BASE}?BusStopCode=${stopCode}`;
+      if (busFilter) url += `&ServiceNo=${busFilter}`;
+
+      try {
+        const response = await fetch(PROXY + encodeURIComponent(url), {
+          headers: {
+            'AccountKey': API_KEY,
+            'accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        const services = data.Services;
+
+        if (!services || services.length === 0) {
+          showError(
+            `No arrivals found for stop <strong>${stopCode}</strong>${busFilter ? ` / bus <strong>${busFilter}</strong>` : ''}.`,
+            'Check the stop code or try without a bus filter.'
+          );
+          setStatus('No results', false);
+          return;
+        }
+
+        const html = services.map(renderBus).join('');
+        document.getElementById('results').innerHTML = `<div class="cards">${html}</div>`;
+        setStatus('Live · Stop ' + stopCode, true);
+        setLastUpdated();
+
+      } catch (err) {
+        showError('Failed to fetch data.', err.message);
+        setStatus('Error', false);
+        console.error(err);
+      }
+    }
+
+    function showError(msg, detail) {
+      document.getElementById('results').innerHTML = `
+        <div class="message-box">
+          <div class="icon">⚠️</div>
+          <p>${msg}</p>
+          ${detail ? `<span class="code">${detail}</span>` : ''}
+        </div>`;
+    }
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+      document.getElementById('lastUpdated').textContent = '';
+      setStatus('Ready', false);
+    }
+
+    function toggleAutoRefresh() {
+      const checked = document.getElementById('autoRefresh').checked;
+      if (checked) {
+        fetchArrivals();
+        refreshInterval = setInterval(fetchArrivals, 30000);
+      } else {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+    }
+
+    // Initial fetch on load
+    fetchArrivals();
+  </script>
 </body>
 </html>
