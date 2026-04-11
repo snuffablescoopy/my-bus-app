@@ -1,71 +1,108 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Debugger</title>
+    <title>SG Bus Tracker</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; }
-        #debug-log { background: #000; padding: 10px; border: 1px solid #444; font-family: monospace; font-size: 12px; height: 300px; overflow-y: scroll; border-radius: 8px; }
-        .error { color: #ff6b6b; }
-        .info { color: #51cf66; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        .container { width: 100%; max-width: 400px; }
+        .stop-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.05); border: 1px solid #eee; }
+        h2 { margin: 0 0 15px 0; color: #007bff; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
+        .bus-no { font-weight: 900; font-size: 1.4rem; color: #333; }
+        .wait { font-weight: 800; font-size: 1.4rem; color: #2ecc71; }
+        .soon { color: #e74c3c; animation: blink 1.2s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        #status { text-align: center; font-size: 0.75rem; color: #7f8c8d; margin-top: 20px; }
+        .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h3>LTA API Debugger</h3>
-    <button onclick="testRequest()" style="padding: 10px; width: 100%;">RUN TEST</button>
-    <p>Status: <span id="status">Idle</span></p>
-    
-    <div id="debug-log"></div>
+<div class="container">
+    <button class="refresh-btn" onclick="update()">🔄 REFRESH BUS TIMINGS</button>
+
+    <div id="stop-09022" class="stop-card">
+        <h2>Orchard Stn (09022)</h2>
+        <div class="results">Connecting...</div>
+    </div>
+
+    <div id="stop-14121" class="stop-card">
+        <h2>Opp Botanic Gdns (14121)</h2>
+        <div class="results">Connecting...</div>
+    </div>
+
+    <div id="status">Syncing with LTA...</div>
+</div>
 
 <script>
     const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-    const logEl = document.getElementById('debug-log');
+    
+    const myTargets = [
+        { stop: '09022', buses: ['190', '972'] },
+        { stop: '14121', buses: ['66', '154'] }
+    ];
 
-    function log(msg, isError = false) {
-        const div = document.createElement('div');
-        div.className = isError ? 'error' : 'info';
-        div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        logEl.prepend(div);
-    }
-
-    async function testRequest() {
-        document.getElementById('status').innerText = "Testing...";
-        log("Starting request...");
-
-        const busStop = '09022';
-        const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${busStop}`;
+    async function update() {
+        document.getElementById('status').innerText = "Updating...";
         
-        // We will try a different proxy approach here
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
+        for (let target of myTargets) {
+            const container = document.querySelector(`#stop-${target.stop} .results`);
+            try {
+                // LTA Endpoint
+                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
+                
+                // We use corsproxy.io but we do NOT send headers via JS (which causes the block)
+                // Instead, we pass the AccountKey inside the URL for the proxy to use
+                const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(ltaUrl)}&key=${API_KEY}`;
 
-        try {
-            log(`Fetching via Proxy: AllOrigins...`);
-            const response = await fetch(proxyUrl);
-            
-            if (!response.ok) {
-                throw new Error(`Proxy responded with status: ${response.status}`);
+                // Simple fetch - the proxy handles the 'AccountKey' header on its end
+                const resp = await fetch(proxyUrl);
+                
+                if (!resp.ok) throw new Error('API Error');
+                
+                const data = await resp.json();
+
+                if (!data || !data.Services) {
+                    container.innerHTML = "<div>No data.</div>";
+                    continue;
+                }
+
+                const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
+
+                if (filtered.length === 0) {
+                    container.innerHTML = "<div style='color:#999'>No buses found.</div>";
+                } else {
+                    container.innerHTML = "";
+                    filtered.forEach(bus => {
+                        const arrival = bus.NextBus.EstimatedArrival;
+                        let timeText = "-";
+                        let wait = null;
+
+                        if (arrival) {
+                            wait = Math.floor((new Date(arrival) - new Date()) / 60000);
+                            timeText = wait <= 0 ? 'Arr' : wait + 'm';
+                        }
+                        
+                        container.innerHTML += `
+                            <div class="row">
+                                <span class="bus-no">${bus.ServiceNo}</span>
+                                <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
+                            </div>`;
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div style='color:#e74c3c; font-size:0.75rem'>Service Busy. Try again in a moment.</div>`;
             }
-
-            const wrapper = await response.json();
-            log("Proxy connection successful.");
-
-            // If using AllOrigins, the LTA response is inside .contents
-            // But AllOrigins doesn't pass custom headers like AccountKey 
-            // unless we do it via a different service.
-            
-            if (wrapper.contents.includes("Unauthorized") || wrapper.contents.includes("Access Denied")) {
-                log("LTA rejected the key. Check if key is active or headers are missing.", true);
-            } else {
-                log("Data received! Check contents: " + wrapper.contents.substring(0, 100) + "...");
-            }
-
-        } catch (err) {
-            log("FETCH FAILED: " + err.message, true);
-            log("Possible cause: CORS block or Local File restriction.", true);
         }
-        document.getElementById('status').innerText = "Test Complete";
+        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
     }
+
+    update();
+    setInterval(update, 30000); 
 </script>
+
 </body>
 </html>
