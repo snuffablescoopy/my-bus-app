@@ -20,84 +20,80 @@
 
 <div class="container">
     <button class="refresh-btn" onclick="update()">🔄 REFRESH BUSES</button>
-
-    <div class="stop-card">
-        <h2>Orchard Stn (09022)</h2>
-        <div id="results-09022">Connecting...</div>
-    </div>
-
-    <div class="stop-card">
-        <h2>Opp Botanic Gdns (14121)</h2>
-        <div id="results-14121">Connecting...</div>
-    </div>
-
-    <div id="debug">Log: Ready</div>
+    <div id="results-09022" class="stop-card"><h2>Orchard Stn (09022)</h2><div class="list">Loading...</div></div>
+    <div id="results-14121" class="stop-card"><h2>Opp Botanic Gdns (14121)</h2><div class="list">Loading...</div></div>
+    <div id="debug">Log: Starting...</div>
 </div>
 
 <script>
-    var API_KEY = '5WOBIXmsSTyK2fmx1NqlSA=='.trim();
+    var API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
     
     function log(msg) {
-        var d = document.getElementById('debug');
-        d.innerHTML = "Log: " + msg;
+        document.getElementById('debug').innerHTML = "Log: " + msg;
     }
 
-    function update() {
-        log("Updating timings...");
+    async function update() {
+        log("Contacting Proxy...");
         var targets = [
             { id: '09022', buses: ['190', '972'] },
             { id: '14121', buses: ['66', '154'] }
         ];
 
-        targets.forEach(function(t) {
-            var display = document.getElementById('results-' + t.id);
-            
-            // This is the EXACT URL LTA uses for their OData service
-            var url = "https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=" + t.id;
+        for (const t of targets) {
+            const listDiv = document.querySelector(`#results-${t.id} .list`);
+            try {
+                // We use AllOrigins proxy and encode the URL twice to bypass LTA's block
+                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${t.id}`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
 
-            fetch(url, {
-                method: 'GET',
-                headers: { 
-                    'AccountKey': API_KEY,
-                    'Accept': 'application/json'
-                }
-            })
-            .then(function(response) {
-                if (response.status === 401) throw new Error("Key Invalid");
-                if (response.status === 404) throw new Error("URL Error");
-                return response.json();
-            })
-            .then(function(data) {
-                log("Data received at " + new Date().toLocaleTimeString());
-                var html = "";
-                if (!data.Services || data.Services.length === 0) {
-                    display.innerHTML = "No buses found.";
-                    return;
+                const response = await fetch(proxyUrl);
+                const wrapper = await response.json();
+                
+                // If the proxy failed to get data
+                if (!wrapper.contents) {
+                    throw new Error("Empty Proxy Response");
                 }
 
-                data.Services.forEach(function(s) {
-                    if (t.buses.indexOf(s.ServiceNo) !== -1) {
-                        var est = s.NextBus.EstimatedArrival;
-                        var wait = "-";
+                // Check if LTA sent an error inside the successful proxy response
+                if (wrapper.contents.includes("Unauthorized")) {
+                    listDiv.innerHTML = "<span style='color:red'>Key Error (401)</span>";
+                    continue;
+                }
+
+                // But wait! LTA needs the AccountKey. AllOrigins doesn't pass headers.
+                // WE MUST USE A DIFFERENT PROXY THAT SUPPORTS HEADERS.
+                // Let's try ThingProxy.
+                const thingUrl = `https://thingproxy.freeboard.io/fetch/${ltaUrl}`;
+                
+                const finalResp = await fetch(thingUrl, {
+                    headers: { 'AccountKey': API_KEY }
+                });
+                
+                const data = await finalResp.json();
+                log("Data success!");
+
+                let html = "";
+                data.Services.forEach(s => {
+                    if (t.buses.includes(s.ServiceNo)) {
+                        const est = s.NextBus.EstimatedArrival;
+                        let wait = "-";
                         if (est) {
-                            var diff = new Date(est) - new Date();
-                            var mins = Math.max(0, Math.floor(diff / 60000));
+                            const mins = Math.max(0, Math.floor((new Date(est) - new Date()) / 60000));
                             wait = mins <= 0 ? "Arr" : mins + "m";
                         }
-                        html += '<div class="row"><span class="bus-no">' + s.ServiceNo + '</span><span class="wait">' + wait + '</span></div>';
+                        html += `<div class="row"><span class="bus-no">${s.ServiceNo}</span><span class="wait">${wait}</span></div>`;
                     }
                 });
-                display.innerHTML = html || "Target buses not active.";
-            })
-            .catch(function(err) {
+                listDiv.innerHTML = html || "No buses found.";
+
+            } catch (err) {
                 log("Error: " + err.message);
-                display.innerHTML = "<div style='color:red'>Request Failed. Refreshing...</div>";
-            });
-        });
+                listDiv.innerHTML = "Connection unstable. Tap Refresh.";
+            }
+        }
     }
 
     window.onload = update;
 </script>
-
 </body>
 </html>
