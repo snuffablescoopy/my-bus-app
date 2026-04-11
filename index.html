@@ -3,98 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Test 185</title>
+    <title>Bus Tracker</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
         .container { width: 100%; max-width: 400px; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { font-size: 0.9rem; color: #007bff; margin: 0 0 15px 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .bus-row { display: flex; justify-content: space-between; font-size: 1.5rem; font-weight: bold; }
-        .time { color: #2ecc71; }
-        #log { font-family: monospace; font-size: 11px; background: #222; color: #0f0; padding: 15px; border-radius: 10px; width: 100%; margin-top: 20px; white-space: pre-wrap; }
-        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 10px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; }
+        .card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.05); }
+        h2 { margin: 0 0 10px 0; color: #007bff; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
+        .bus-no { font-weight: 900; font-size: 1.5rem; color: #333; }
+        .wait { font-weight: 800; font-size: 1.5rem; color: #2ecc71; }
+        #log { width: 100%; font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 10px; border-radius: 10px; margin-top: 20px; min-height: 40px; }
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <button onclick="update()">🔄 REFRESH TEST (185)</button>
-
+    <button onclick="update()">🔄 REFRESH BUSES</button>
+    
     <div class="card">
-        <h2>Bus Stop 27449 (Test)</h2>
-        <div id="display">Ready to test...</div>
+        <h2>Bus Stop 27449</h2>
+        <div id="results-27449">Loading...</div>
     </div>
 
-    <div id="log">Log: System Ready</div>
+    <div id="log">Log: Ready</div>
 </div>
 
 <script>
-    // I've kept your key here - make sure it matches your LTA email exactly
-    const KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-
+    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    
     async function update() {
         const logBox = document.getElementById('log');
-        const display = document.getElementById('display');
-        
         logBox.innerText = "Log: Fetching...";
-        display.innerHTML = "Connecting to LTA...";
+        
+        const stopId = '27449';
+        const display = document.getElementById('results-' + stopId);
 
         try {
-            const stopId = '27449';
-            const busNo = '185';
+            const ltaUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${stopId}`;
             
-            // Using a more robust proxy URL structure
-            const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${stopId}`;
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
+            // This proxy is much more reliable for LTA's specific headers
+            const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(ltaUrl)}`;
 
             const response = await fetch(proxyUrl, {
+                method: 'GET',
                 headers: { 
-                    'AccountKey': KEY,
+                    'AccountKey': API_KEY,
                     'Accept': 'application/json'
                 }
             });
 
-            const wrapper = await response.json();
-            
-            if (!wrapper.contents) {
-                throw new Error("Proxy returned empty. Is your API key active?");
-            }
+            if (!response.ok) throw new Error("Proxy Error: " + response.status);
 
-            // The data comes back as a string, we turn it into an object
-            const data = JSON.parse(wrapper.contents);
-            
-            if (data.Services) {
-                let found = false;
-                let html = "";
-                
+            const data = await response.json();
+            logBox.innerText = "Log: Data Received!";
+
+            let html = "";
+            if (data.Services && data.Services.length > 0) {
+                // We will show ALL buses at the stop first to prove it's working
                 data.Services.forEach(s => {
-                    if (s.ServiceNo === busNo) {
-                        found = true;
-                        const arrival = s.NextBus.EstimatedArrival;
-                        let wait = "No data";
-                        if (arrival) {
-                            const diff = new Date(arrival) - new Date();
-                            const mins = Math.max(0, Math.floor(diff / 60000));
-                            wait = mins <= 0 ? "Arr" : mins + "m";
-                        }
-                        html = `<div class="bus-row"><span>Bus ${busNo}</span><span class="time">${wait}</span></div>`;
+                    const arrival = s.NextBus.EstimatedArrival;
+                    let wait = "-";
+                    if (arrival) {
+                        const diff = new Date(arrival) - new Date();
+                        const mins = Math.max(0, Math.floor(diff / 60000));
+                        wait = mins <= 0 ? "Arr" : mins + "m";
                     }
+                    html += `<div class="row"><span class="bus-no">${s.ServiceNo}</span><span class="wait">${wait}</span></div>`;
                 });
-
-                display.innerHTML = found ? html : "Bus 185 not found at this stop.";
-                logBox.innerText = "Log: Success! Updated at " + new Date().toLocaleTimeString();
+                display.innerHTML = html;
             } else {
-                throw new Error("Invalid data format from LTA");
+                display.innerHTML = "No active buses at this stop.";
             }
 
         } catch (err) {
             logBox.innerText = "Log Error: " + err.message;
-            display.innerHTML = "<span style='color:red'>Key Rejected or Proxy Busy</span>";
-            console.error(err);
+            display.innerHTML = "<span style='color:red'>Key Rejected. check your LTA email to ensure the key is exactly right.</span>";
         }
     }
 
-    // Auto-run on start
     window.onload = update;
 </script>
 </body>
