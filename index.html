@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bus Tracker</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 400px; }
+        .stop-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { margin: 0 0 10px 0; color: #007bff; font-size: 1rem; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
+        .row:last-child { border-bottom: none; }
+        .bus-no { font-weight: 800; font-size: 1.2rem; color: #333; }
+        .wait { font-weight: bold; font-size: 1.2rem; color: #28a745; }
+        .soon { color: #dc3545; }
+        #status { text-align: center; font-size: 0.75rem; color: #999; margin-top: 15px; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align:center;"> My Bus Tracker</h2>
+    
+    <button onclick="update()">Manual Refresh</button>
+
+    <div id="stop-09022" class="stop-card">
+        <h2>Orchard Stn (09022)</h2>
+        <div class="results">Connecting...</div>
+    </div>
+
+    <div id="stop-14121" class="stop-card">
+        <h2>Opp Botanic Gdns (14121)</h2>
+        <div class="results">Connecting...</div>
+    </div>
+
+    <div id="status">Syncing...</div>
+</div>
+
+<script>
+    // YOUR CORRECTED KEY
+    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    
+    const myTargets = [
+        { stop: '09022', buses: ['190', '972'] },
+        { stop: '14121', buses: ['66', '154'] }
+    ];
+
+    async function update() {
+        document.getElementById('status').innerText = "Syncing with LTA...";
+        
+        for (let target of myTargets) {
+            const container = document.querySelector(`#stop-${target.stop} .results`);
+            try {
+                const url = `https://mytransport.sg{target.stop}`;
+                
+                // Using corsproxy.io which handles AccountKey headers very well
+                const resp = await fetch(`https://corsproxy.io{encodeURIComponent(url)}`, {
+                    method: 'GET',
+                    headers: {
+                        'AccountKey': API_KEY,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!resp.ok) throw new Error('Auth Error');
+                
+                const data = await resp.json();
+                container.innerHTML = "";
+                
+                const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
+
+                if (filtered.length === 0) {
+                    container.innerHTML = "<div style='color:#888'>No tracked buses found.</div>";
+                } else {
+                    filtered.forEach(bus => {
+                        const arrival = bus.NextBus.EstimatedArrival;
+                        const wait = arrival ? Math.max(0, Math.floor((new Date(arrival) - new Date()) / 60000)) : null;
+                        const timeText = (wait === null) ? 'N/A' : (wait <= 0 ? 'Arr' : wait + 'm');
+                        
+                        container.innerHTML += `
+                            <div class="row">
+                                <span class="bus-no">${bus.ServiceNo}</span>
+                                <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
+                            </div>`;
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = "<div style='color:red'>Key Error. Check DataMall.</div>";
+            }
+        }
+        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
+    }
+
+    // Auto-update every 30 seconds
+    update();
+    setInterval(update, 30000);
+</script>
+
+</body>
+</html>
