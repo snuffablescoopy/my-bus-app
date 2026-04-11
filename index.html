@@ -3,94 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Tracker</title>
+    <title>SG Bus Arrival</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { width: 100%; max-width: 400px; }
-        .stop-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h2 { font-size: 0.9rem; color: #007bff; margin: 0 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .bus-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f9f9f9; }
-        .bus-no { font-weight: bold; font-size: 1.2rem; }
-        .arrival { font-weight: bold; color: #2ecc71; font-size: 1.2rem; }
-        #status { font-size: 0.8rem; color: #888; margin-top: 10px; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        .container { width: 100%; max-width: 400px; margin-top: 20px; }
+        .stop-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.05); }
+        h2 { margin: 0 0 15px 0; color: #007bff; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f9f9f9; }
+        .bus-no { font-weight: 900; font-size: 1.5rem; color: #333; }
+        .wait { font-weight: 800; font-size: 1.5rem; color: #2ecc71; }
+        .soon { color: #e74c3c; animation: blink 1.2s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        #status { text-align: center; font-size: 0.75rem; color: #7f8c8d; margin-top: 20px; }
+        .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; font-size: 1rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="stop-card">
-        <h2>Orchard Stn (09022)</h2>
-        <div id="results-09022">Loading...</div>
-    </div>
+    <button class="refresh-btn" onclick="update()">🔄 REFRESH BUSES</button>
 
     <div class="stop-card">
-        <h2>Opp Botanic Gdns (14121)</h2>
-        <div id="results-14121">Loading...</div>
-    </div>
-    
-    <div id="status">Waiting for update...</div>
-</div>
-
-<script>
-    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-    const targets = [
-        { id: '09022', buses: ['190', '972'] },
-        { id: '14121', buses: ['66', '154'] }
-    ];
-
-    async function fetchBusData() {
-        document.getElementById('status').innerText = "Updating...";
-
-        for (const target of targets) {
-            const display = document.getElementById(`results-${target.id}`);
-            try {
-                // We use AllOrigins to bypass the header-blocking issue
-                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.id}`;
-                const finalUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
-
-                // We send the AccountKey directly in the fetch
-                const response = await fetch(finalUrl, {
-                    headers: { 'AccountKey': API_KEY }
-                });
-
-                const wrapper = await response.json();
-                
-                // AllOrigins returns the data inside a 'contents' string
-                const data = JSON.parse(wrapper.contents);
-                
-                if (!data.Services || data.Services.length === 0) {
-                    display.innerHTML = "No buses found.";
-                    continue;
-                }
-
-                let html = "";
-                data.Services.forEach(service => {
-                    if (target.buses.includes(service.ServiceNo)) {
-                        const estimate = service.NextBus.EstimatedArrival;
-                        let wait = "-";
-                        if (estimate) {
-                            const diff = new Date(estimate) - new Date();
-                            const mins = Math.max(0, Math.floor(diff / 60000));
-                            wait = mins <= 0 ? "Arr" : mins + "m";
-                        }
-                        html += `<div class="bus-row"><span class="bus-no">${service.ServiceNo}</span><span class="arrival">${wait}</span></div>`;
-                    }
-                });
-
-                display.innerHTML = html || "Target buses not active.";
-
-            } catch (err) {
-                // If this triggers, the proxy itself is likely blocked
-                display.innerHTML = "Proxy connection failed.";
-                console.error(err);
-            }
-        }
-        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
-    }
-
-    fetchBusData();
-    setInterval(fetchBusData, 30000);
-</script>
-
-</body>
-</html>
+        <h2>
