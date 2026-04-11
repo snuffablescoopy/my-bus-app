@@ -1,25 +1,108 @@
-async function update() {
-    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-    const stopId = '09022';
-    // Note: We use http inside the encoded URL
-    const targetUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${stopId}`;
-    
-    // Different Proxy: AllOrigins
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bus Tracker</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f4f7f6; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 400px; }
+        .stop-card { background: white; padding: 18px; border-radius: 16px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; }
+        h2 { margin: 0 0 12px 0; color: #007bff; font-size: 0.9rem; text-transform: uppercase; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
+        .bus-no { font-weight: 800; font-size: 1.3rem; color: #2c3e50; }
+        .wait { font-weight: bold; font-size: 1.3rem; color: #27ae60; }
+        .soon { color: #e74c3c; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.6; } }
+        #status { text-align: center; font-size: 0.75rem; color: #95a5a6; margin-top: 20px; }
+        .refresh-btn { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 12px; font-weight: bold; margin-bottom: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-    try {
-        const response = await fetch(proxyUrl);
-        const json = await response.json();
+<div class="container">
+    <button class="refresh-btn" onclick="update()">🔄 REFRESH NOW</button>
+
+    <div id="stop-09022" class="stop-card">
+        <h2>Orchard Stn (09022)</h2>
+        <div class="results">Loading...</div>
+    </div>
+
+    <div id="stop-14121" class="stop-card">
+        <h2>Opp Botanic Gdns (14121)</h2>
+        <div class="results">Loading...</div>
+    </div>
+
+    <div id="status">Ready</div>
+</div>
+
+<script>
+    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    
+    const myTargets = [
+        { stop: '09022', buses: ['190', '972'] },
+        { stop: '14121', buses: ['66', '154'] }
+    ];
+
+    async function update() {
+        document.getElementById('status').innerText = "Updating...";
         
-        // AllOrigins wraps the result in a "contents" string
-        const data = JSON.parse(json.contents);
-        
-        console.log("Success!", data);
-        if (data.Services) {
-            document.getElementById('status').innerText = "Data received!";
+        for (let target of myTargets) {
+            const container = document.querySelector(`#stop-${target.stop} .results`);
+            try {
+                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
+                
+                // Using AllOrigins proxy (it handles HTTP sites better)
+                // We add a cache-buster (?t=) to make sure we get live data
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}&t=${Date.now()}`;
+
+                const resp = await fetch(proxyUrl, {
+                    headers: { 
+                        // Note: Some proxies don't forward headers well. 
+                        // If this fails, the key might need to be sent in the URL (rare for LTA).
+                        'AccountKey': API_KEY
+                    }
+                });
+
+                if (!resp.ok) throw new Error('Proxy Error');
+                
+                const wrapper = await resp.json();
+                // AllOrigins returns the data as a string in the "contents" property
+                const data = JSON.parse(wrapper.contents);
+
+                if (!data || !data.Services) {
+                    throw new Error('Invalid Data');
+                }
+
+                container.innerHTML = "";
+                const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
+
+                if (filtered.length === 0) {
+                    container.innerHTML = "<div style='color:#999'>No buses found.</div>";
+                } else {
+                    filtered.forEach(bus => {
+                        const arrival = bus.NextBus.EstimatedArrival;
+                        const wait = arrival ? Math.max(0, Math.floor((new Date(arrival) - new Date()) / 60000)) : null;
+                        const timeText = (wait === null) ? '-' : (wait <= 0 ? 'Arr' : wait + 'm');
+                        
+                        container.innerHTML += `
+                            <div class="row">
+                                <span class="bus-no">${bus.ServiceNo}</span>
+                                <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
+                            </div>`;
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<div style='color:#e74c3c; font-size:0.8rem'>Error: Proxy blocked or Key invalid.</div>`;
+            }
         }
-    } catch (err) {
-        console.error("The error is:", err);
-        document.getElementById('status').innerText = "Still failing. Check console.";
+        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
     }
-}
+
+    update();
+    setInterval(update, 30000); 
+</script>
+
+</body>
+</html>
