@@ -1,29 +1,30 @@
 async function update() {
     document.getElementById('status').innerText = "Updating...";
-    
-    // IMPORTANT: You must visit https://cors-anywhere.herokuapp.com/corsdemo 
-    // and click "Request temporary access" for this to work!
     const proxyUrl = "https://cors-anywhere.herokuapp.com/";
     
     for (let target of myTargets) {
         const container = document.querySelector(`#stop-${target.stop} .results`);
         try {
-            const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
+            // Try HTTPS first, it's more stable for GitHub
+            const ltaUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
 
             const resp = await fetch(proxyUrl + ltaUrl, {
                 method: 'GET',
                 headers: { 
                     'AccountKey': '5WOBIXmsSTyK2fmx1NqlSA==',
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest' // Some proxies require this
                 }
             });
 
             if (resp.status === 403) {
-                container.innerHTML = `<div style='color:#f39c12; font-size:0.7rem'>Click the 'CORS Demo' link to enable access.</div>`;
+                container.innerHTML = "<div style='color:#f39c12; font-size:0.7rem'>Visit <a href='https://cors-anywhere.herokuapp.com/corsdemo' target='_blank'>CORS Demo</a> & click the button!</div>";
                 continue;
             }
 
-            if (!resp.ok) throw new Error('LTA Rejected Request');
+            if (!resp.ok) {
+                throw new Error(`Status: ${resp.status}`);
+            }
             
             const data = await resp.json();
             container.innerHTML = "";
@@ -36,7 +37,7 @@ async function update() {
                 filtered.forEach(bus => {
                     const arrival = bus.NextBus.EstimatedArrival;
                     const wait = arrival ? Math.max(0, Math.floor((new Date(arrival) - new Date()) / 60000)) : null;
-                    const timeText = (wait === null) ? '-' : (wait <= 0 ? 'Arr' : wait + 'm');
+                    const timeText = (wait === null) ? '-' : (wait <= 0 ? 'Arr' : (wait > 60 ? '>60m' : wait + 'm'));
                     
                     container.innerHTML += `
                         <div class="row">
@@ -46,8 +47,8 @@ async function update() {
                 });
             }
         } catch (e) {
-            console.error(e);
-            container.innerHTML = `<div style='color:#e74c3c; font-size:0.75rem'>LTA Key Rejected or Proxy Down.</div>`;
+            console.error("LTA Error:", e);
+            container.innerHTML = `<div style='color:#e74c3c; font-size:0.75rem'>Error: ${e.message}. Check Key.</div>`;
         }
     }
     document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
