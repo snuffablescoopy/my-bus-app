@@ -1,56 +1,71 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SG Bus Tracker</title>
+    <title>Bus Debugger</title>
     <style>
-        /* Modern, Clean Mobile Styling */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background: #f0f2f5; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center;
-            margin: 0;
-        }
-        .container { width: 100%; max-width: 400px; }
-        .stop-card { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 20px; 
-            margin-bottom: 20px; 
-            box-shadow: 0 10px 20px rgba(0,0,0,0.05); 
-            border: 1px solid rgba(0,0,0,0.05); 
-        }
-        h2 { 
-            margin: 0 0 15px 0; 
-            color: #007bff; 
-            font-size: 0.85rem; 
-            letter-spacing: 1px;
-            text-transform: uppercase; 
-            border-bottom: 2px solid #f0f2f5; 
-            padding-bottom: 10px; 
-        }
-        .row { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 15px 0; 
-            border-bottom: 1px solid #f9f9f9; 
-        }
-        .row:last-child { border-bottom: none; }
-        .bus-no { font-weight: 900; font-size: 1.5rem; color: #1a1a1a; }
-        .wait { font-weight: 800; font-size: 1.5rem; color: #2ecc71; }
-        
-        /* Animation for approaching buses */
-        .soon { color: #e74c3c; animation: blink 1.2s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
+        body { font-family: sans-serif; padding: 20px; background: #121212; color: white; }
+        #debug-log { background: #000; padding: 10px; border: 1px solid #444; font-family: monospace; font-size: 12px; height: 300px; overflow-y: scroll; border-radius: 8px; }
+        .error { color: #ff6b6b; }
+        .info { color: #51cf66; }
+    </style>
+</head>
+<body>
 
-        #status { 
-            text-align: center; 
-            font-size: 0.75rem; 
-            color: #7f8c8d; 
-            margin-top: 25px; 
-            font-weight: 500;
+    <h3>LTA API Debugger</h3>
+    <button onclick="testRequest()" style="padding: 10px; width: 100%;">RUN TEST</button>
+    <p>Status: <span id="status">Idle</span></p>
+    
+    <div id="debug-log"></div>
+
+<script>
+    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    const logEl = document.getElementById('debug-log');
+
+    function log(msg, isError = false) {
+        const div = document.createElement('div');
+        div.className = isError ? 'error' : 'info';
+        div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logEl.prepend(div);
+    }
+
+    async function testRequest() {
+        document.getElementById('status').innerText = "Testing...";
+        log("Starting request...");
+
+        const busStop = '09022';
+        const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${busStop}`;
+        
+        // We will try a different proxy approach here
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
+
+        try {
+            log(`Fetching via Proxy: AllOrigins...`);
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Proxy responded with status: ${response.status}`);
+            }
+
+            const wrapper = await response.json();
+            log("Proxy connection successful.");
+
+            // If using AllOrigins, the LTA response is inside .contents
+            // But AllOrigins doesn't pass custom headers like AccountKey 
+            // unless we do it via a different service.
+            
+            if (wrapper.contents.includes("Unauthorized") || wrapper.contents.includes("Access Denied")) {
+                log("LTA rejected the key. Check if key is active or headers are missing.", true);
+            } else {
+                log("Data received! Check contents: " + wrapper.contents.substring(0, 100) + "...");
+            }
+
+        } catch (err) {
+            log("FETCH FAILED: " + err.message, true);
+            log("Possible cause: CORS block or Local File restriction.", true);
+        }
+        document.getElementById('status').innerText = "Test Complete";
+    }
+</script>
+</body>
+</html>
