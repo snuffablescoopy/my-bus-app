@@ -5,92 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SG Bus Tracker</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 400px; }
-        .stop-card { background: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 16px rgba(0,0,0,0.05); }
-        h2 { margin: 0 0 10px 0; color: #007bff; font-size: 0.85rem; text-transform: uppercase; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
-        .bus-no { font-weight: 900; font-size: 1.5rem; color: #333; }
-        .wait { font-weight: 800; font-size: 1.5rem; color: #2ecc71; }
-        #debug { width: 100%; max-width: 400px; font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 10px; border-radius: 10px; margin-top: 20px; }
-        .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { font-size: 0.8rem; color: #007bff; margin: 0 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .bus-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f9f9f9; font-size: 1.2rem; font-weight: bold; }
+        .time { color: #2ecc71; }
+        #log { font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 10px; border-radius: 10px; width: 100%; margin-top: 20px; }
+        button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 10px; font-weight: bold; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <button class="refresh-btn" onclick="update()">🔄 REFRESH BUSES</button>
-    <div id="stop-09022" class="stop-card"><h2>Orchard Stn (09022)</h2><div class="results">Loading...</div></div>
-    <div id="stop-14121" class="stop-card"><h2>Opp Botanic Gdns (14121)</h2><div class="results">Loading...</div></div>
-    <div id="debug">Log: Starting...</div>
+    <button onclick="update()">REFRESH TIMINGS</button>
+
+    <div class="card">
+        <h2>Orchard Stn (09022)</h2>
+        <div id="stop-09022">Loading...</div>
+    </div>
+
+    <div class="card">
+        <h2>Opp Botanic Gdns (14121)</h2>
+        <div id="stop-14121">Loading...</div>
+    </div>
+
+    <div id="log">Status: Initializing...</div>
 </div>
 
 <script>
-    // MAKE SURE THERE ARE NO SPACES IN THIS KEY BELOW
-    const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
-    const targets = [
-        { id: '09022', buses: ['190', '972'] },
-        { id: '14121', buses: ['66', '154'] }
-    ];
+    // CRITICAL: Double check your key. It should be 24 characters ending in ==
+    const KEY = '5WOBIXmsSTyK2fmx1NqlSA=='.trim();
 
     async function update() {
-        document.getElementById('debug').innerText = "Log: Requesting...";
-        
-        for (const target of targets) {
-            const container = document.querySelector(`#stop-${target.id} .results`);
+        const statusLog = document.getElementById('log');
+        statusLog.innerText = "Status: Fetching data...";
+
+        const targets = [
+            { id: '09022', buses: ['190', '972'] },
+            { id: '14121', buses: ['66', '154'] }
+        ];
+
+        for (const t of targets) {
+            const display = document.getElementById(`stop-${t.id}`);
             try {
-                // Testing the HTTPS version of the LTA link
-                const ltaUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.id}`;
-                
-                // Using corsproxy.io
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ltaUrl)}`;
+                // Using a proxy that allows us to pass the AccountKey more reliably
+                const ltaUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${t.id}`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(ltaUrl)}`;
 
                 const response = await fetch(proxyUrl, {
-                    method: 'GET',
-                    headers: { 
-                        'AccountKey': API_KEY,
-                        'Accept': 'application/json'
-                    }
+                    headers: { 'AccountKey': KEY }
                 });
 
-                if (response.status === 404) {
-                    // If 404, let's try the fallback V1 URL
-                    const fallbackUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrival?BusStopCode=${target.id}`;
-                    const fbProxy = `https://corsproxy.io/?${encodeURIComponent(fallbackUrl)}`;
-                    const fbRes = await fetch(fbProxy, { headers: { 'AccountKey': API_KEY }});
-                    if (!fbRes.ok) throw new Error("Both V1 and V2 failed (404)");
-                    var data = await fbRes.json();
-                } else {
-                    var data = await response.json();
-                }
-
+                const wrapper = await response.json();
+                
+                // AllOrigins wraps the LTA response inside a "contents" string
+                if (!wrapper.contents) throw new Error("Proxy Empty");
+                
+                const data = JSON.parse(wrapper.contents);
                 let html = "";
-                if (data.Services && data.Services.length > 0) {
+
+                if (data.Services) {
                     data.Services.forEach(s => {
-                        if (target.buses.includes(s.ServiceNo)) {
-                            const est = s.NextBus.EstimatedArrival;
+                        if (t.buses.includes(s.ServiceNo)) {
+                            const arrival = s.NextBus.EstimatedArrival;
                             let wait = "-";
-                            if (est) {
-                                const diff = new Date(est) - new Date();
+                            if (arrival) {
+                                const diff = new Date(arrival) - new Date();
                                 const mins = Math.max(0, Math.floor(diff / 60000));
-                                wait = (mins <= 0) ? "Arr" : mins + "m";
+                                wait = mins <= 0 ? "Arr" : mins + "m";
                             }
-                            html += `<div class="row"><span class="bus-no">${s.ServiceNo}</span><span class="wait">${wait}</span></div>`;
+                            html += `<div class="bus-row"><span>${s.ServiceNo}</span><span class="time">${wait}</span></div>`;
                         }
                     });
                 }
-                container.innerHTML = html || "No buses running.";
-                document.getElementById('debug').innerText = "Log: Success at " + new Date().toLocaleTimeString();
+
+                display.innerHTML = html || "No buses found.";
+                statusLog.innerText = "Status: Updated " + new Date().toLocaleTimeString();
 
             } catch (err) {
-                document.getElementById('debug').innerText = "Log Error: " + err.message;
-                container.innerHTML = "<div style='color:red'>Updating...</div>";
+                console.error(err);
+                statusLog.innerText = "Status Error: " + err.message;
+                display.innerHTML = "Check API Key or Proxy.";
             }
         }
     }
 
-    update();
-    setInterval(update, 30000);
+    window.onload = update;
 </script>
 </body>
 </html>
