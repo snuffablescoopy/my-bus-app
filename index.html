@@ -22,10 +22,11 @@
     <button class="refresh-btn" onclick="update()">🔄 REFRESH BUSES</button>
     <div id="stop-09022" class="stop-card"><h2>Orchard Stn (09022)</h2><div class="results">Loading...</div></div>
     <div id="stop-14121" class="stop-card"><h2>Opp Botanic Gdns (14121)</h2><div class="results">Loading...</div></div>
-    <div id="debug">Log: Ready</div>
+    <div id="debug">Log: Starting...</div>
 </div>
 
 <script>
+    // MAKE SURE THERE ARE NO SPACES IN THIS KEY BELOW
     const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
     const targets = [
         { id: '09022', buses: ['190', '972'] },
@@ -38,25 +39,32 @@
         for (const target of targets) {
             const container = document.querySelector(`#stop-${target.id} .results`);
             try {
-                // Remove any trailing slashes and ensure HTTP (LTA's native protocol)
-                const ltaBase = "http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2";
-                const ltaUrl = `${ltaBase}?BusStopCode=${target.id}`;
+                // Testing the HTTPS version of the LTA link
+                const ltaUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.id}`;
                 
-                // Using corsproxy.io with the direct URL format
+                // Using corsproxy.io
                 const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ltaUrl)}`;
 
                 const response = await fetch(proxyUrl, {
                     method: 'GET',
-                    headers: { 'AccountKey': API_KEY }
+                    headers: { 
+                        'AccountKey': API_KEY,
+                        'Accept': 'application/json'
+                    }
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                if (response.status === 404) {
+                    // If 404, let's try the fallback V1 URL
+                    const fallbackUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrival?BusStopCode=${target.id}`;
+                    const fbProxy = `https://corsproxy.io/?${encodeURIComponent(fallbackUrl)}`;
+                    const fbRes = await fetch(fbProxy, { headers: { 'AccountKey': API_KEY }});
+                    if (!fbRes.ok) throw new Error("Both V1 and V2 failed (404)");
+                    var data = await fbRes.json();
+                } else {
+                    var data = await response.json();
                 }
 
-                const data = await response.json();
                 let html = "";
-                
                 if (data.Services && data.Services.length > 0) {
                     data.Services.forEach(s => {
                         if (target.buses.includes(s.ServiceNo)) {
@@ -71,16 +79,13 @@
                         }
                     });
                 }
-                container.innerHTML = html || "No buses found.";
+                container.innerHTML = html || "No buses running.";
                 document.getElementById('debug').innerText = "Log: Success at " + new Date().toLocaleTimeString();
 
             } catch (err) {
                 document.getElementById('debug').innerText = "Log Error: " + err.message;
                 container.innerHTML = "<div style='color:red'>Updating...</div>";
-                // If 404 persists, we might need to try the HTTPS version of the LTA URL
             }
-            // Small pause between stops to prevent rate-limiting
-            await new Promise(r => setTimeout(r, 500));
         }
     }
 
