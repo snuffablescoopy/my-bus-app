@@ -5,14 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bus 185 Tracker</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; flex-direction: column; align-items: center; margin: 0; }
         .container { width: 100%; max-width: 400px; }
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
-        .bus-row { display: flex; justify-content: space-between; align-items: center; }
-        .bus-no { font-weight: 900; font-size: 2.2rem; color: #333; }
-        .time { font-weight: 900; font-size: 2.2rem; color: #2ecc71; }
+        .card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; text-align: center; }
+        .bus-row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .bus-no { font-weight: 900; font-size: 2.5rem; color: #333; }
+        .time { font-weight: 900; font-size: 2.5rem; color: #2ecc71; }
+        .unit { font-size: 1rem; margin-left: 2px; }
         #log { font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 15px; border-radius: 12px; width: 100%; margin-top: 20px; white-space: pre-wrap; box-sizing: border-box; }
-        button { width: 100%; padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; }
+        button { width: 100%; padding: 18px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; margin-bottom: 20px; font-size: 1rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,123,255,0.3); }
+        h2 { font-size: 0.8rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -20,9 +22,10 @@
 <div class="container">
     <button onclick="update()">🔄 REFRESH BUS 185</button>
     <div class="card">
-        <div id="display">Initializing...</div>
+        <h2>Bus Stop 27449</h2>
+        <div id="display">Waiting for data...</div>
     </div>
-    <div id="log">Log: Ready</div>
+    <div id="log">Log: Bridge Access Activated?</div>
 </div>
 
 <script>
@@ -31,36 +34,35 @@
     async function update() {
         const logBox = document.getElementById('log');
         const display = document.getElementById('display');
-        logBox.innerText = "Log: Requesting via AllOrigins...";
+        logBox.innerText = "Log: Crossing the Bridge...";
 
         try {
-            // Using the precise HTTPS endpoint from the PDF
-            const targetUrl = `https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=27449`;
+            // THE TARGET
+            const ltaUrl = 'https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=27449';
             
-            // Adding a timestamp to the URL to prevent "Cached" 404 errors
-            const cacheBuster = `&t=${new Date().getTime()}`;
-            const finalUrl = targetUrl + cacheBuster;
+            // THE BRIDGE (This only works because you clicked 'Request Access')
+            const proxyUrl = 'https://cors-anywhere.herokuapp.com/' + ltaUrl;
 
-            // We use the "get" endpoint of AllOrigins
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(finalUrl)}`;
+            const response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: { 
+                    'AccountKey': API_KEY,
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
 
-            const response = await fetch(proxyUrl);
-            const wrapper = await response.json();
-
-            if (!wrapper.contents) {
-                throw new Error("No data returned from Proxy");
+            if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error("Bridge Expired. Click 'Request Access' again.");
+                }
+                throw new Error("LTA Error: " + response.status);
             }
 
-            // LTA returns a 404 inside the content if the headers are missing.
-            // But AllOrigins doesn't always pass headers. Let's try the direct blob.
-            if (wrapper.contents.includes("404 Not Found")) {
-                 throw new Error("LTA Server returned 404. Key may not be active.");
-            }
+            const data = await response.json();
+            logBox.innerText = "Log: SUCCESS! Bridge crossed.";
 
-            const data = JSON.parse(wrapper.contents);
-            logBox.innerText = "Log: Success!";
-            
-            let html = "No Bus 185 info.";
+            let html = "Bus 185 not found.";
             if (data.Services) {
                 data.Services.forEach(s => {
                     if (s.ServiceNo === '185') {
@@ -69,7 +71,7 @@
                         if (arrival) {
                             const diff = new Date(arrival) - new Date();
                             const mins = Math.max(0, Math.floor(diff / 60000));
-                            wait = mins <= 0 ? "Arr" : mins + "m";
+                            wait = mins <= 0 ? "Arr" : mins + '<span class="unit">m</span>';
                         }
                         html = `<div class="bus-row"><span class="bus-no">${s.ServiceNo}</span><span class="time">${wait}</span></div>`;
                     }
@@ -78,16 +80,14 @@
             display.innerHTML = html;
 
         } catch (err) {
-            logBox.innerText += "\n" + err.message;
-            // If we get a 404 here, we'll try the ONLY other way: a different proxy provider
-            if(err.message.includes("JSON")) {
-                logBox.innerText += "\nMalformed JSON - Proxy likely blocked.";
-            }
-            display.innerHTML = "<span style='color:red'>Data Error. Refreshing...</span>";
+            logBox.innerText = "Log Error: " + err.message;
+            display.innerHTML = `<span style='color:red'>Bridge Blocked</span>`;
+            console.error(err);
         }
     }
 
-    window.onload = update;
+    // Run on load
+    update();
 </script>
 </body>
 </html>
