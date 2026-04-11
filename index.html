@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bus Tracker Pro</title>
+    <title>SG Bus Tracker</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; margin: 0; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 400px; }
@@ -13,7 +13,7 @@
         .bus-no { font-weight: 900; font-size: 1.5rem; color: #333; }
         .wait { font-weight: 800; font-size: 1.5rem; color: #2ecc71; }
         .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
-        #debug { width: 100%; max-width: 400px; font-family: monospace; font-size: 10px; background: #333; color: #0f0; padding: 10px; border-radius: 10px; margin-top: 20px; overflow-x: auto; }
+        #debug { width: 100%; max-width: 400px; font-family: monospace; font-size: 10px; background: #222; color: #0f0; padding: 10px; border-radius: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -23,15 +23,15 @@
 
     <div class="stop-card">
         <h2>Orchard Stn (09022)</h2>
-        <div id="results-09022">Waiting...</div>
+        <div id="results-09022">Connecting...</div>
     </div>
 
     <div class="stop-card">
         <h2>Opp Botanic Gdns (14121)</h2>
-        <div id="results-14121">Waiting...</div>
+        <div id="results-14121">Connecting...</div>
     </div>
 
-    <div id="debug">Log: System Start...</div>
+    <div id="debug">Log: Ready</div>
 </div>
 
 <script>
@@ -39,12 +39,11 @@
     
     function log(msg) {
         var d = document.getElementById('debug');
-        d.innerHTML += "<br>> " + msg;
-        console.log(msg);
+        d.innerHTML = "Log: " + msg;
     }
 
     function update() {
-        log("Fetching fresh data...");
+        log("Updating timings...");
         var targets = [
             { id: '09022', buses: ['190', '972'] },
             { id: '14121', buses: ['66', '154'] }
@@ -52,25 +51,32 @@
 
         targets.forEach(function(t) {
             var display = document.getElementById('results-' + t.id);
-            // Force HTTPS to satisfy GitHub's security
+            
+            // This is the EXACT URL LTA uses for their OData service
             var url = "https://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=" + t.id;
 
             fetch(url, {
                 method: 'GET',
-                headers: { 'AccountKey': API_KEY }
+                headers: { 
+                    'AccountKey': API_KEY,
+                    'Accept': 'application/json'
+                }
             })
             .then(function(response) {
-                if (!response.ok) throw new Error("HTTP " + response.status);
+                if (response.status === 401) throw new Error("Key Invalid");
+                if (response.status === 404) throw new Error("URL Error");
                 return response.json();
             })
             .then(function(data) {
-                log("Data received for " + t.id);
+                log("Data received at " + new Date().toLocaleTimeString());
                 var html = "";
-                var found = false;
+                if (!data.Services || data.Services.length === 0) {
+                    display.innerHTML = "No buses found.";
+                    return;
+                }
 
                 data.Services.forEach(function(s) {
                     if (t.buses.indexOf(s.ServiceNo) !== -1) {
-                        found = true;
                         var est = s.NextBus.EstimatedArrival;
                         var wait = "-";
                         if (est) {
@@ -81,12 +87,17 @@
                         html += '<div class="row"><span class="bus-no">' + s.ServiceNo + '</span><span class="wait">' + wait + '</span></div>';
                     }
                 });
-
-                display.innerHTML = html || "No matching buses found.";
+                display.innerHTML = html || "Target buses not active.";
             })
             .catch(function(err) {
-                log("FAILED " + t.id + ": " + err.message);
-                display.innerHTML = "<div style='color:red; font-size:12px;'>Block detected. Tap lock icon > Site Settings > Insecure Content > Allow.</div>";
+                log("Error: " + err.message);
+                display.innerHTML = "<div style='color:red'>Request Failed. Refreshing...</div>";
             });
         });
     }
+
+    window.onload = update;
+</script>
+
+</body>
+</html>
