@@ -1,115 +1,25 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Bus Tracker</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f7f6; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 400px; }
-        .stop-card { background: white; padding: 18px; border-radius: 16px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; }
-        h2 { margin: 0 0 12px 0; color: #007bff; font-size: 0.9rem; text-transform: uppercase; border-bottom: 1px solid #f0f0f0; padding-bottom: 8px; }
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f9f9f9; }
-        .row:last-child { border-bottom: none; }
-        .bus-no { font-weight: 800; font-size: 1.3rem; color: #2c3e50; }
-        .wait { font-weight: bold; font-size: 1.3rem; color: #27ae60; }
-        .soon { color: #e74c3c; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.6; } }
-        #status { text-align: center; font-size: 0.75rem; color: #95a5a6; margin-top: 20px; }
-        .refresh-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 12px; font-weight: bold; margin-bottom: 20px; cursor: pointer; transition: background 0.2s; }
-        .refresh-btn:active { background: #0056b3; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <button class="refresh-btn" onclick="update()">🔄 REFRESH NOW</button>
-
-    <div id="stop-09022" class="stop-card">
-        <h2>Orchard Stn (09022)</h2>
-        <div class="results">Loading...</div>
-    </div>
-
-    <div id="stop-14121" class="stop-card">
-        <h2>Opp Botanic Gdns (14121)</h2>
-        <div class="results">Loading...</div>
-    </div>
-
-    <div id="status">Syncing...</div>
-</div>
-
-<script>
-    // Your LTA DataMall Account Key
+async function update() {
     const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+    const stopId = '09022';
+    // Note: We use http inside the encoded URL
+    const targetUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${stopId}`;
     
-    const myTargets = [
-        { stop: '09022', buses: ['190', '972'] },
-        { stop: '14121', buses: ['66', '154'] }
-    ];
+    // Different Proxy: AllOrigins
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
 
-    async function update() {
-        document.getElementById('status').innerText = "Updating...";
+    try {
+        const response = await fetch(proxyUrl);
+        const json = await response.json();
         
-        for (let target of myTargets) {
-            const container = document.querySelector(`#stop-${target.stop} .results`);
-            try {
-                // Official LTA Bus Arrival Endpoint
-                const apiUrl = `http://datamall2.mytransport.sg/ltaodataservice/BusArrivalv2?BusStopCode=${target.stop}`;
-                
-                // Using corsproxy.io to bypass browser CORS restrictions
-                const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`, {
-                    headers: { 
-                        'AccountKey': API_KEY,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!resp.ok) throw new Error('API Error');
-                
-                const data = await resp.json();
-                container.innerHTML = "";
-                
-                // Filter for the specific buses you want to see
-                const filtered = data.Services.filter(s => target.buses.includes(s.ServiceNo));
-
-                if (filtered.length === 0) {
-                    container.innerHTML = "<div style='color:#999'>No buses found.</div>";
-                } else {
-                    filtered.forEach(bus => {
-                        const arrival = bus.NextBus.EstimatedArrival;
-                        
-                        // Calculate time difference in minutes
-                        let timeText = "-";
-                        let wait = null;
-
-                        if (arrival) {
-                            const now = new Date();
-                            const arrivalTime = new Date(arrival);
-                            wait = Math.floor((arrivalTime - now) / 60000);
-                            timeText = wait <= 0 ? 'Arr' : wait + 'm';
-                        }
-                        
-                        container.innerHTML += `
-                            <div class="row">
-                                <span class="bus-no">${bus.ServiceNo}</span>
-                                <span class="wait ${wait !== null && wait < 3 ? 'soon' : ''}">${timeText}</span>
-                            </div>`;
-                    });
-                }
-            } catch (e) {
-                console.error("Fetch error:", e);
-                container.innerHTML = "<div style='color:#e74c3c; font-size:0.8rem'>Connection Error. Check Key/Proxy.</div>";
-            }
+        // AllOrigins wraps the result in a "contents" string
+        const data = JSON.parse(json.contents);
+        
+        console.log("Success!", data);
+        if (data.Services) {
+            document.getElementById('status').innerText = "Data received!";
         }
-        document.getElementById('status').innerText = "Last Sync: " + new Date().toLocaleTimeString();
+    } catch (err) {
+        console.error("The error is:", err);
+        document.getElementById('status').innerText = "Still failing. Check console.";
     }
-
-    // Initial load
-    update();
-
-    // Refresh every 30 seconds
-    setInterval(update, 30000); 
-</script>
-
-</body>
-</html>
+}
