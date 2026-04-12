@@ -145,7 +145,6 @@
       50% { opacity: 0.3; }
     }
 
-    /* View toggle: Next only vs Next 3 */
     .view-toggle {
       display: flex;
       background: var(--surface);
@@ -225,7 +224,6 @@
     .btn-refresh:active { transform: scale(0.97); }
     .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ── Groups ── */
     .groups { display: flex; flex-direction: column; gap: 16px; }
 
     .group {
@@ -258,10 +256,8 @@
     .stop-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
     .stop-road { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
 
-    /* ── Bus rows ── */
     .bus-rows { display: flex; flex-direction: column; }
 
-    /* Next-only mode: 2 columns */
     .bus-row {
       display: grid;
       align-items: center;
@@ -272,8 +268,7 @@
 
     .bus-row + .bus-row { border-top: 1px solid var(--border); }
 
-    /* Grid changes based on view mode */
-    .mode-next .bus-row  { grid-template-columns: 64px 1fr; }
+    .mode-next  .bus-row { grid-template-columns: 64px 1fr; }
     .mode-three .bus-row { grid-template-columns: 64px 1fr 1fr 1fr; }
 
     .bus-num {
@@ -291,12 +286,10 @@
       gap: 2px;
     }
 
-    /* In next-only mode, make it bigger and left-aligned */
     .mode-next .arrival-cell {
-      align-items: flex-start;
       flex-direction: row;
-      gap: 10px;
       align-items: center;
+      gap: 10px;
     }
 
     .slot-label {
@@ -306,7 +299,6 @@
       letter-spacing: 0.1em;
     }
 
-    /* hide label in next-only mode */
     .mode-next .slot-label { display: none; }
 
     .slot-time {
@@ -315,7 +307,6 @@
       line-height: 1;
     }
 
-    /* Bigger in next-only mode */
     .mode-next .slot-time { font-size: 28px; }
 
     .slot-time.soon   { color: var(--red); }
@@ -342,7 +333,6 @@
     .bus-tag.sd  { background: rgba(232,255,71,0.1);  color: var(--accent); }
     .bus-tag.dd  { background: rgba(251,146,60,0.15); color: var(--orange); }
 
-    /* Loading skeleton */
     .slot-time.loading-val {
       color: var(--muted);
       font-size: 16px !important;
@@ -359,20 +349,6 @@
       font-size: 11px;
       color: var(--red);
     }
-
-    /* proxy notice */
-    .proxy-notice {
-      background: rgba(251,146,60,0.08);
-      border: 1px solid rgba(251,146,60,0.25);
-      border-radius: 6px;
-      padding: 10px 16px;
-      font-size: 11px;
-      color: var(--orange);
-      margin-bottom: 16px;
-      display: none;
-    }
-
-    .proxy-notice.show { display: block; }
 
     .updated-bar {
       margin-top: 18px;
@@ -415,7 +391,7 @@
       </div>
       <div class="view-toggle">
         <button id="btnNext"  class="active" onclick="setView('next')">Next only</button>
-        <button id="btnThree"            onclick="setView('three')">Next 3</button>
+        <button id="btnThree"              onclick="setView('three')">Next 3</button>
       </div>
       <label class="refresh-toggle">
         <div class="toggle">
@@ -428,10 +404,6 @@
     </div>
   </header>
 
-  <div class="proxy-notice" id="proxyNotice">
-    ⚠ Having trouble reaching the LTA API. Trying backup proxy… If this persists, try refreshing.
-  </div>
-
   <div class="groups mode-next" id="groups"></div>
 
   <div class="updated-bar" id="updatedBar"></div>
@@ -439,81 +411,53 @@
 
 </div>
 <script>
-  const API_KEY = '5WOBIXmsSTyK2fmx1NqlSA==';
+  // ── Your Cloudflare Worker handles the API key and CORS ──
+  const WORKER = 'https://ltaproxy.snuffablescoopy.workers.dev';
   const LTA_URL = 'https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival';
 
-  // Two proxies — we try the first, fall back to second if it fails
-  const PROXIES = [
-    url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  ];
-
   const STOPS = [
-    { code: '22009', name: 'Boon Lay Int',           road: 'Jurong West Ctrl 3',     buses: ['181', '180'] },
-    { code: '21581', name: 'Blk 65',                 road: 'Corporation Dr',          buses: ['98'] },
-    { code: '27449', name: 'Aft Westwood Ave',        road: 'Jurong West Ave 5',      buses: ['185'] },
-    { code: '21161', name: 'Blk 216B',               road: 'Jurong West',             buses: ['157', '185'] },
-    { code: '43531', name: 'Blk 140',                road: 'Bt Batok West Ave 3',     buses: ['157', '174'] },
-    { code: '43769', name: 'Dulwich Coll / Blk 445', road: 'Bt Batok Rd',            buses: ['180'] },
-    { code: '40389', name: 'Blk 119',                road: 'Plantation Cres, Tengah', buses: ['992'] },
+    { code: '22009', name: 'Boon Lay Int',           road: 'Jurong West Ctrl 3',      buses: ['181', '180'] },
+    { code: '21581', name: 'Blk 65',                 road: 'Corporation Dr',           buses: ['98'] },
+    { code: '27449', name: 'Aft Westwood Ave',        road: 'Jurong West Ave 5',       buses: ['185'] },
+    { code: '21161', name: 'Blk 216B',               road: 'Jurong West',              buses: ['157', '185'] },
+    { code: '43531', name: 'Blk 140',                road: 'Bt Batok West Ave 3',      buses: ['157', '174'] },
+    { code: '43769', name: 'Dulwich Coll / Blk 445', road: 'Bt Batok Rd',             buses: ['180'] },
+    { code: '40389', name: 'Blk 119',                road: 'Plantation Cres, Tengah',  buses: ['992'] },
   ];
 
-  let autoTimer   = null;
-  let viewMode    = 'next';   // 'next' | 'three'
-  let activeProxy = 0;        // index into PROXIES
+  let autoTimer = null;
+  let viewMode  = 'next';
 
-  // ── Fetch with automatic proxy fallback ──
+  // ── Fetch via your Worker ──
   async function fetchLTA(stopCode, busNo) {
-    const url = `${LTA_URL}?BusStopCode=${stopCode}&ServiceNo=${busNo}`;
-
-    for (let attempt = 0; attempt < PROXIES.length; attempt++) {
-      const proxyIdx = (activeProxy + attempt) % PROXIES.length;
-      try {
-        const res = await fetch(PROXIES[proxyIdx](url), {
-          headers: { 'AccountKey': API_KEY, 'accept': 'application/json' },
-          signal: AbortSignal.timeout(8000)
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        // Validate: if Services is missing it's likely a proxy error page
-        if (!Array.isArray(data.Services)) throw new Error('Bad response');
-
-        // Promote this proxy if it worked after a fallback
-        if (attempt > 0) {
-          activeProxy = proxyIdx;
-          document.getElementById('proxyNotice').classList.remove('show');
-        }
-        return data;
-      } catch (e) {
-        if (attempt === 0 && PROXIES.length > 1) {
-          document.getElementById('proxyNotice').classList.add('show');
-        }
-        if (attempt === PROXIES.length - 1) throw e;
-      }
-    }
+    const target = `${LTA_URL}?BusStopCode=${stopCode}&ServiceNo=${busNo}`;
+    const res = await fetch(`${WORKER}/?url=${encodeURIComponent(target)}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) throw new Error(`Worker responded ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.Services)) throw new Error('Unexpected response format');
+    return data;
   }
 
-  // ── Parse arrival time into minutes ──
+  // ── Parse arrival minutes ──
   function getMin(iso) {
-    // Reject missing, zero-date, or obviously invalid timestamps
     if (!iso || iso.startsWith('0001') || iso === '') return null;
     const diff = (new Date(iso) - Date.now()) / 60000;
-    // If diff is wildly negative (bad data) treat as null
-    if (diff < -2) return null;
+    if (diff < -2) return null;   // stale / bad data
     return Math.max(0, Math.round(diff));
   }
 
   // ── View toggle ──
   function setView(mode) {
     viewMode = mode;
-    const grp = document.getElementById('groups');
-    grp.className = mode === 'next' ? 'groups mode-next' : 'groups mode-three';
+    document.getElementById('groups').className =
+      mode === 'next' ? 'groups mode-next' : 'groups mode-three';
     document.getElementById('btnNext').className  = mode === 'next'  ? 'active' : '';
     document.getElementById('btnThree').className = mode === 'three' ? 'active' : '';
   }
 
-  // ── Skeleton ──
+  // ── Build skeleton ──
   function buildSkeleton() {
     const container = document.getElementById('groups');
     container.innerHTML = '';
@@ -527,7 +471,7 @@
           <span class="stop-road">${stop.road}</span>
         </div>
         <div class="bus-rows" id="rows-${stop.code}">
-          ${stop.buses.map(b => skeletonRow(b)).join('')}
+          ${stop.buses.map(skeletonRow).join('')}
         </div>`;
       container.appendChild(g);
     });
@@ -536,18 +480,9 @@
   function skeletonRow(busNo) {
     return `<div class="bus-row">
       <div class="bus-num">${busNo}</div>
-      <div class="arrival-cell">
-        <div class="slot-label">Next</div>
-        <div class="slot-time loading-val">···</div>
-      </div>
-      <div class="arrival-cell">
-        <div class="slot-label">2nd</div>
-        <div class="slot-time loading-val">···</div>
-      </div>
-      <div class="arrival-cell">
-        <div class="slot-label">3rd</div>
-        <div class="slot-time loading-val">···</div>
-      </div>
+      <div class="arrival-cell"><div class="slot-label">Next</div><div class="slot-time loading-val">···</div></div>
+      <div class="arrival-cell"><div class="slot-label">2nd</div><div class="slot-time loading-val">···</div></div>
+      <div class="arrival-cell"><div class="slot-label">3rd</div><div class="slot-time loading-val">···</div></div>
     </div>`;
   }
 
@@ -555,19 +490,14 @@
   async function fetchAll() {
     const btn = document.getElementById('refreshBtn');
     btn.disabled = true;
-    setStatus('Fetching…', 'loading');
+    setStatus('Fetching…', '');
 
-    const results = await Promise.allSettled(STOPS.map(s => fetchStop(s)));
-    const errors = results.filter(r => r.status === 'rejected' || r.value === false).length;
+    const results = await Promise.allSettled(STOPS.map(fetchStop));
+    const errors  = results.filter(r => r.status === 'rejected' || r.value === false).length;
 
-    if (errors === 0) {
-      setStatus('Live', 'live');
-      document.getElementById('proxyNotice').classList.remove('show');
-    } else if (errors < STOPS.length) {
-      setStatus(`Live (${errors} error${errors > 1 ? 's' : ''})`, 'live');
-    } else {
-      setStatus('Failed to load', 'error');
-    }
+    if (errors === 0)              setStatus('Live', 'live');
+    else if (errors < STOPS.length) setStatus(`Live (${errors} error${errors > 1 ? 's' : ''})`, 'live');
+    else                           setStatus('Failed to load', 'error');
 
     document.getElementById('updatedBar').textContent =
       'Last updated: ' + new Date().toLocaleTimeString('en-SG', { hour12: false });
@@ -584,7 +514,7 @@
       el.innerHTML = rows.join('');
       return true;
     } catch (e) {
-      el.innerHTML = `<div class="error-row">⚠ Could not load: ${e.message}</div>`;
+      el.innerHTML = `<div class="error-row">⚠ Could not load stop ${stop.code}: ${e.message}</div>`;
       return false;
     }
   }
@@ -625,8 +555,8 @@
 
   function setStatus(text, state) {
     document.getElementById('statusText').textContent = text;
-    const dot = document.getElementById('statusDot');
-    dot.className = 'dot' + (state === 'live' ? ' live' : state === 'error' ? ' error' : '');
+    document.getElementById('statusDot').className =
+      'dot' + (state === 'live' ? ' live' : state === 'error' ? ' error' : '');
   }
 
   function toggleAutoRefresh() {
