@@ -64,13 +64,14 @@
       margin: 0 auto;
     }
 
+    /* ── Header ── */
     header {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      margin-bottom: 32px;
+      margin-bottom: 20px;
     }
 
     .bus-badge {
@@ -132,17 +133,64 @@
       flex-shrink: 0;
     }
 
-    .dot.live {
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      animation: pulse 2s infinite;
-    }
-
+    .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 2s infinite; }
     .dot.error { background: var(--red); }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.3; }
+    }
+
+    /* ── Location bar ── */
+    .location-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .loc-icon { font-size: 16px; flex-shrink: 0; }
+
+    .loc-text {
+      flex: 1;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      min-width: 0;
+    }
+
+    .loc-text strong { color: var(--text); }
+
+    .btn-show-all {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid rgba(232,255,71,0.3);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-show-all:hover { background: rgba(232,255,71,0.08); }
+    .btn-show-all.active { background: rgba(232,255,71,0.15); }
+
+    /* ── Controls row ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
     }
 
     .view-toggle {
@@ -166,11 +214,7 @@
       transition: all 0.15s;
     }
 
-    .view-toggle button.active {
-      background: var(--accent);
-      color: #0d0f14;
-      font-weight: 600;
-    }
+    .view-toggle button.active { background: var(--accent); color: #0d0f14; font-weight: 600; }
 
     .refresh-toggle {
       display: flex;
@@ -218,12 +262,29 @@
       border-radius: 4px;
       cursor: pointer;
       transition: all 0.15s;
+      margin-left: auto;
     }
 
     .btn-refresh:hover { background: #d4e83a; }
     .btn-refresh:active { transform: scale(0.97); }
     .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* ── No nearby stops message ── */
+    .no-nearby {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px;
+      text-align: center;
+      display: none;
+    }
+
+    .no-nearby.show { display: block; }
+    .no-nearby .icon { font-size: 32px; margin-bottom: 12px; }
+    .no-nearby p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .no-nearby strong { color: var(--text); }
+
+    /* ── Groups ── */
     .groups { display: flex; flex-direction: column; gap: 16px; }
 
     .group {
@@ -231,6 +292,11 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .group.hidden {
+      display: none;
     }
 
     .group-header {
@@ -256,6 +322,17 @@
     .stop-name { font-size: 13px; color: var(--text); flex: 1; min-width: 0; }
     .stop-road { font-size: 10px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
 
+    /* distance badge */
+    .dist-badge {
+      font-size: 10px;
+      color: var(--accent2);
+      background: rgba(71,200,255,0.1);
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Bus rows ── */
     .bus-rows { display: flex; flex-direction: column; }
 
     .bus-row {
@@ -279,34 +356,13 @@
       letter-spacing: -0.02em;
     }
 
-    .arrival-cell {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
+    .arrival-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .mode-next .arrival-cell { flex-direction: row; align-items: center; gap: 10px; }
 
-    .mode-next .arrival-cell {
-      flex-direction: row;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .slot-label {
-      font-size: 9px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
+    .slot-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
     .mode-next .slot-label { display: none; }
 
-    .slot-time {
-      font-size: 20px;
-      font-weight: 500;
-      line-height: 1;
-    }
-
+    .slot-time { font-size: 20px; font-weight: 500; line-height: 1; }
     .mode-next .slot-time { font-size: 28px; }
 
     .slot-time.soon   { color: var(--red); }
@@ -333,39 +389,15 @@
     .bus-tag.sd  { background: rgba(232,255,71,0.1);  color: var(--accent); }
     .bus-tag.dd  { background: rgba(251,146,60,0.15); color: var(--orange); }
 
-    .slot-time.loading-val {
-      color: var(--muted);
-      font-size: 16px !important;
-      animation: blink 1.2s infinite;
-    }
+    .slot-time.loading-val { color: var(--muted); font-size: 16px !important; animation: blink 1.2s infinite; }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.2; }
-    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 
-    .error-row {
-      padding: 14px 18px;
-      font-size: 11px;
-      color: var(--red);
-    }
+    .error-row { padding: 14px 18px; font-size: 11px; color: var(--red); }
 
-    .updated-bar {
-      margin-top: 18px;
-      text-align: center;
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: 0.05em;
-    }
+    .updated-bar { margin-top: 18px; text-align: center; font-size: 10px; color: var(--muted); letter-spacing: 0.05em; }
 
-    footer {
-      margin-top: 8px;
-      text-align: center;
-      font-size: 10px;
-      color: var(--muted);
-      opacity: 0.5;
-      letter-spacing: 0.05em;
-    }
+    footer { margin-top: 8px; text-align: center; font-size: 10px; color: var(--muted); opacity: 0.5; letter-spacing: 0.05em; }
 
     @media (max-width: 480px) {
       .mode-three .bus-row { grid-template-columns: 50px 1fr 1fr 1fr; padding: 10px 12px; }
@@ -389,20 +421,37 @@
         <span class="dot" id="statusDot"></span>
         <span id="statusText">Loading…</span>
       </div>
-      <div class="view-toggle">
-        <button id="btnNext"              onclick="setView('next')">Next only</button>
-        <button id="btnThree" class="active" onclick="setView('three')">Next 3</button>
-      </div>
-      <label class="refresh-toggle">
-        <div class="toggle">
-          <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()" />
-          <span class="slider"></span>
-        </div>
-        Auto 30s
-      </label>
-      <button class="btn-refresh" id="refreshBtn" onclick="fetchAll()">↻ Refresh</button>
     </div>
   </header>
+
+  <!-- Location bar -->
+  <div class="location-bar">
+    <span class="loc-icon" id="locIcon">📍</span>
+    <span class="loc-text" id="locText">Detecting your location…</span>
+    <button class="btn-show-all" id="btnShowAll" onclick="toggleShowAll()">Show all stops</button>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="view-toggle">
+      <button id="btnNext"              onclick="setView('next')">Next only</button>
+      <button id="btnThree" class="active" onclick="setView('three')">Next 3</button>
+    </div>
+    <label class="refresh-toggle">
+      <div class="toggle">
+        <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()" />
+        <span class="slider"></span>
+      </div>
+      Auto 30s
+    </label>
+    <button class="btn-refresh" id="refreshBtn" onclick="fetchAll()">↻ Refresh</button>
+  </div>
+
+  <!-- No nearby stops message -->
+  <div class="no-nearby" id="noNearby">
+    <div class="icon">🗺️</div>
+    <p>No tracked stops within <strong>400m</strong> of your current location.<br>Tap <strong>Show all stops</strong> to view everything.</p>
+  </div>
 
   <div class="groups mode-three" id="groups"></div>
 
@@ -411,41 +460,126 @@
 
 </div>
 <script>
-  // ── Your Cloudflare Worker handles the API key and CORS ──
-  const WORKER = 'https://ltaproxy.snuffablescoopy.workers.dev';
+  const WORKER  = 'https://ltaproxy.snuffablescoopy.workers.dev';
   const LTA_URL = 'https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival';
+  const RADIUS  = 400; // metres
 
+  // Stop coordinates sourced from LTA/OpenStreetMap
   const STOPS = [
-    { code: '22009', name: 'Boon Lay Int',           road: 'Jurong West Ctrl 3',      buses: ['181', '180'] },
-    { code: '21581', name: 'Blk 65',                 road: 'Corporation Dr',           buses: ['98'] },
-    { code: '27449', name: 'Aft Westwood Ave',        road: 'Jurong West Ave 5',       buses: ['185'] },
-    { code: '21161', name: 'Blk 216B',               road: 'Jurong West',              buses: ['157', '185'] },
-    { code: '43531', name: 'Blk 140',                road: 'Bt Batok West Ave 3',      buses: ['157', '174'] },
-    { code: '43769', name: 'Dulwich Coll / Blk 445', road: 'Bt Batok Rd',             buses: ['180'] },
-    { code: '40389', name: 'Blk 119',                road: 'Plantation Cres, Tengah',  buses: ['992'] },
+    { code: '22009', name: 'Boon Lay Int',           road: 'Jurong West Ctrl 3',      lat: 1.34034, lng: 103.70575, buses: ['181', '180'] },
+    { code: '21581', name: 'Blk 65',                 road: 'Corporation Dr',           lat: 1.33394, lng: 103.70842, buses: ['98'] },
+    { code: '27449', name: 'Aft Westwood Ave',        road: 'Jurong West Ave 5',       lat: 1.33059, lng: 103.69740, buses: ['185'] },
+    { code: '21161', name: 'Blk 216B',               road: 'Jurong West',              lat: 1.34498, lng: 103.71365, buses: ['157', '185'] },
+    { code: '43531', name: 'Blk 140',                road: 'Bt Batok West Ave 3',      lat: 1.34785, lng: 103.74394, buses: ['157', '174'] },
+    { code: '43769', name: 'Dulwich Coll / Blk 445', road: 'Bt Batok Rd',             lat: 1.34339, lng: 103.75806, buses: ['180'] },
+    { code: '40389', name: 'Blk 119',                road: 'Plantation Cres, Tengah',  lat: 1.37276, lng: 103.74398, buses: ['992'] },
   ];
 
-  let autoTimer = null;
-  let viewMode  = 'three';
+  let autoTimer   = null;
+  let viewMode    = 'three';
+  let showAll     = false;
+  let userLat     = null;
+  let userLng     = null;
+  let coordsReady = false;
 
-  // ── Fetch via your Worker ──
-  async function fetchLTA(stopCode, busNo) {
-    const target = `${LTA_URL}?BusStopCode=${stopCode}&ServiceNo=${busNo}`;
-    const res = await fetch(`${WORKER}/?url=${encodeURIComponent(target)}`, {
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) throw new Error(`Worker responded ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data.Services)) throw new Error('Unexpected response format');
-    return data;
+  // ── Haversine distance in metres ──
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.asin(Math.sqrt(a));
   }
 
-  // ── Parse arrival minutes ──
-  function getMin(iso) {
-    if (!iso || iso.startsWith('0001') || iso === '') return null;
-    const diff = (new Date(iso) - Date.now()) / 60000;
-    if (diff < -2) return null;   // stale / bad data
-    return Math.max(0, Math.round(diff));
+  // ── Geolocation ──
+  function initLocation() {
+    if (!navigator.geolocation) {
+      setLocText('📍', 'Location not supported by this browser. Showing all stops.');
+      showAllStops();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        coordsReady = true;
+        applyLocationFilter();
+      },
+      err => {
+        let msg = 'Location unavailable. Showing all stops.';
+        if (err.code === 1) msg = 'Location permission denied. Showing all stops.';
+        setLocText('⚠️', msg);
+        showAllStops();
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+
+  function applyLocationFilter() {
+    if (!coordsReady || showAll) return;
+
+    // Calculate distance for each stop
+    let nearbyCount = 0;
+    STOPS.forEach(stop => {
+      stop.distance = Math.round(haversine(userLat, userLng, stop.lat, stop.lng));
+    });
+
+    const nearby = STOPS.filter(s => s.distance <= RADIUS);
+    nearbyCount = nearby.length;
+
+    // Update each group card
+    STOPS.forEach(stop => {
+      const el = document.getElementById(`group-${stop.code}`);
+      if (!el) return;
+      const isNearby = stop.distance <= RADIUS;
+      el.classList.toggle('hidden', !isNearby);
+
+      // Update distance badge
+      const badge = el.querySelector('.dist-badge');
+      if (badge) badge.textContent = `${stop.distance}m`;
+    });
+
+    // Show/hide "no nearby" message
+    document.getElementById('noNearby').classList.toggle('show', nearbyCount === 0);
+
+    // Update location bar text
+    if (nearbyCount === 0) {
+      setLocText('📍', `You are <strong>${STOPS.map(s=>s.distance).sort((a,b)=>a-b)[0]}m</strong> from the nearest tracked stop (${RADIUS}m radius active)`);
+    } else {
+      const names = nearby.map(s => s.name).join(', ');
+      setLocText('📍', `Within <strong>${RADIUS}m</strong>: ${names}`);
+    }
+  }
+
+  function showAllStops() {
+    showAll = true;
+    STOPS.forEach(stop => {
+      const el = document.getElementById(`group-${stop.code}`);
+      if (el) el.classList.remove('hidden');
+    });
+    document.getElementById('noNearby').classList.remove('show');
+    document.getElementById('btnShowAll').classList.add('active');
+    document.getElementById('btnShowAll').textContent = 'Showing all';
+  }
+
+  function toggleShowAll() {
+    if (showAll) {
+      // Go back to location filter
+      showAll = false;
+      document.getElementById('btnShowAll').classList.remove('active');
+      document.getElementById('btnShowAll').textContent = 'Show all stops';
+      if (coordsReady) applyLocationFilter();
+    } else {
+      showAllStops();
+    }
+  }
+
+  function setLocText(icon, html) {
+    document.getElementById('locIcon').textContent = icon;
+    document.getElementById('locText').innerHTML = html;
   }
 
   // ── View toggle ──
@@ -463,11 +597,13 @@
     container.innerHTML = '';
     STOPS.forEach(stop => {
       const g = document.createElement('div');
-      g.className = 'group';
+      g.className = 'group hidden'; // hidden until location determined
+      g.id = `group-${stop.code}`;
       g.innerHTML = `
         <div class="group-header">
           <span class="stop-code">${stop.code}</span>
           <span class="stop-name">${stop.name}</span>
+          <span class="dist-badge">···</span>
           <span class="stop-road">${stop.road}</span>
         </div>
         <div class="bus-rows" id="rows-${stop.code}">
@@ -486,6 +622,25 @@
     </div>`;
   }
 
+  // ── Fetch via Worker ──
+  async function fetchLTA(stopCode, busNo) {
+    const target = `${LTA_URL}?BusStopCode=${stopCode}&ServiceNo=${busNo}`;
+    const res = await fetch(`${WORKER}/?url=${encodeURIComponent(target)}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) throw new Error(`Worker responded ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.Services)) throw new Error('Unexpected response format');
+    return data;
+  }
+
+  function getMin(iso) {
+    if (!iso || iso.startsWith('0001') || iso === '') return null;
+    const diff = (new Date(iso) - Date.now()) / 60000;
+    if (diff < -2) return null;
+    return Math.max(0, Math.round(diff));
+  }
+
   // ── Fetch all stops ──
   async function fetchAll() {
     const btn = document.getElementById('refreshBtn');
@@ -495,9 +650,9 @@
     const results = await Promise.allSettled(STOPS.map(fetchStop));
     const errors  = results.filter(r => r.status === 'rejected' || r.value === false).length;
 
-    if (errors === 0)              setStatus('Live', 'live');
+    if (errors === 0)               setStatus('Live', 'live');
     else if (errors < STOPS.length) setStatus(`Live (${errors} error${errors > 1 ? 's' : ''})`, 'live');
-    else                           setStatus('Failed to load', 'error');
+    else                            setStatus('Failed to load', 'error');
 
     document.getElementById('updatedBar').textContent =
       'Last updated: ' + new Date().toLocaleTimeString('en-SG', { hour12: false });
@@ -519,7 +674,6 @@
     }
   }
 
-  // ── Render one bus row ──
   function renderRow(busNo, svc) {
     const buses  = svc ? [svc.NextBus, svc.NextBus2, svc.NextBus3] : [null, null, null];
     const labels = ['Next', '2nd', '3rd'];
@@ -566,9 +720,11 @@
     }
   }
 
+  // ── Init ──
   buildSkeleton();
   fetchAll();
-  autoTimer = setInterval(fetchAll, 30000); // auto-refresh on by default
+  autoTimer = setInterval(fetchAll, 30000);
+  initLocation(); // ask for location immediately
 </script>
 </body>
 </html>
