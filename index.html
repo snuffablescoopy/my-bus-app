@@ -390,12 +390,12 @@
         <span id="statusText">Loading…</span>
       </div>
       <div class="view-toggle">
-        <button id="btnNext"  class="active" onclick="setView('next')">Next only</button>
-        <button id="btnThree"              onclick="setView('three')">Next 3</button>
+        <button id="btnNext"              onclick="setView('next')">Next only</button>
+        <button id="btnThree" class="active" onclick="setView('three')">Next 3</button>
       </div>
       <label class="refresh-toggle">
         <div class="toggle">
-          <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" />
+          <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()" />
           <span class="slider"></span>
         </div>
         Auto 30s
@@ -404,7 +404,7 @@
     </div>
   </header>
 
-  <div class="groups mode-next" id="groups"></div>
+  <div class="groups mode-three" id="groups"></div>
 
   <div class="updated-bar" id="updatedBar"></div>
   <footer>Data from LTA DataMall · Timings are estimates only</footer>
@@ -426,7 +426,7 @@
   ];
 
   let autoTimer = null;
-  let viewMode  = 'next';
+  let viewMode  = 'three';
 
   // ── Fetch via your Worker ──
   async function fetchLTA(stopCode, busNo) {
@@ -568,6 +568,7 @@
 
   buildSkeleton();
   fetchAll();
+  autoTimer = setInterval(fetchAll, 30000); // auto-refresh on by default
 </script>
 </body>
 </html>
